@@ -808,20 +808,21 @@ public class MysqlQueryProvider extends QueryProvider {
             }
             return stringBuilder.toString();
         }).toArray(String[]::new);
+        table = table.trim().startsWith("(") ? table : String.format(MySQLConstants.KEYWORD_TABLE, table);
         return MessageFormat.format("SELECT {0} FROM {1}  LIMIT DE_OFFSET, DE_PAGE_SIZE ", StringUtils.join(array, ","), table);
     }
 
     public String getTotalCount(boolean isTable, String sql, Datasource ds) {
-        if(isTable){
+        if (isTable) {
             return "SELECT COUNT(*) from " + String.format(MySQLConstants.KEYWORD_TABLE, sql);
-        }else {
+        } else {
             return "SELECT COUNT(*) from ( " + sqlFix(sql) + " ) DE_COUNT_TEMP";
         }
     }
 
     @Override
     public String createRawQuerySQLAsTmp(String sql, List<DatasetTableField> fields) {
-        return createRawQuerySQL(" (" + sqlFix(sql) + ") AS DE_TEMP", fields, null);
+        return createRawQuerySQL("(" + sqlFix(sql) + ") AS DE_TEMP", fields, null);
     }
 
     public String transTreeItem(SQLObj tableObj, DatasetRowPermissionsTreeItem item) {
@@ -1061,14 +1062,17 @@ public class MysqlQueryProvider extends QueryProvider {
                 }
 
                 if (field.getDeType() == 1) {
-                    if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5) {
-                        whereName = String.format(MySQLConstants.STR_TO_DATE, originName, StringUtils.isNotEmpty(field.getDateFormat()) ? field.getDateFormat() : MysqlConstants.DEFAULT_DATE_FORMAT);
+                    String format = transDateFormat(request.getDateStyle(), request.getDatePattern());
+                    if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5 || field.getDeExtractType() == 1) {
+                        if (StringUtils.equalsIgnoreCase(request.getDateStyle(), "y_Q")) {
+                            whereName = String.format(format,
+                                    String.format(MysqlConstants.DATE_FORMAT, originName, "%Y"),
+                                    String.format(MysqlConstants.QUARTER, String.format(MysqlConstants.DATE_FORMAT, originName, MysqlConstants.DEFAULT_DATE_FORMAT)));
+                        } else {
+                            whereName = String.format(MySQLConstants.DATE_FORMAT, originName, format);
+                        }
                     }
                     if (field.getDeExtractType() == 2 || field.getDeExtractType() == 3 || field.getDeExtractType() == 4) {
-                        String cast = String.format(MySQLConstants.CAST, originName, MySQLConstants.DEFAULT_INT_FORMAT) + "/1000";
-                        whereName = String.format(MySQLConstants.FROM_UNIXTIME, cast, MySQLConstants.DEFAULT_DATE_FORMAT);
-                    }
-                    if (field.getDeExtractType() == 1) {
                         whereName = originName;
                     }
                 } else if (field.getDeType() == 2 || field.getDeType() == 3) {
@@ -1102,10 +1106,16 @@ public class MysqlQueryProvider extends QueryProvider {
                 whereValue = "'%" + value.get(0) + "%'";
             } else if (StringUtils.containsIgnoreCase(request.getOperator(), "between")) {
                 if (request.getDatasetTableField().getDeType() == 1) {
-                    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-                    String startTime = simpleDateFormat.format(new Date(Long.parseLong(value.get(0))));
-                    String endTime = simpleDateFormat.format(new Date(Long.parseLong(value.get(1))));
-                    whereValue = String.format(MySQLConstants.WHERE_BETWEEN, startTime, endTime);
+                    if (request.getDatasetTableField().getDeExtractType() == 2
+                            || request.getDatasetTableField().getDeExtractType() == 3
+                            || request.getDatasetTableField().getDeExtractType() == 4) {
+                        whereValue = String.format(MysqlConstants.WHERE_BETWEEN, value.get(0), value.get(1));
+                    } else {
+                        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                        String startTime = simpleDateFormat.format(new Date(Long.parseLong(value.get(0))));
+                        String endTime = simpleDateFormat.format(new Date(Long.parseLong(value.get(1))));
+                        whereValue = String.format(MySQLConstants.WHERE_BETWEEN, startTime, endTime);
+                    }
                 } else {
                     whereValue = String.format(MySQLConstants.WHERE_BETWEEN, value.get(0), value.get(1));
                 }

@@ -34,6 +34,7 @@ import io.dataease.plugins.common.base.mapper.*;
 import io.dataease.plugins.common.constants.DatasetType;
 import io.dataease.plugins.common.constants.DatasourceTypes;
 import io.dataease.plugins.common.constants.DeTypeConstants;
+import io.dataease.plugins.common.dto.chart.ChartViewFieldDTO;
 import io.dataease.plugins.common.dto.dataset.SqlVariableDetails;
 import io.dataease.plugins.common.dto.datasource.DataSourceType;
 import io.dataease.plugins.common.dto.datasource.TableField;
@@ -143,9 +144,10 @@ public class DataSetTableService {
     private static boolean isUpdatingDatasetTableStatus = false;
     private static final String lastUpdateTime = "${__last_update_time__}";
     private static final String currentUpdateTime = "${__current_update_time__}";
-    private static final String regex = "\\$\\{(.*?)\\}";
+    public static final String regex = "\\$\\{(.*?)\\}";
     private static final String SubstitutedParams = "DATAEASE_PATAMS_BI";
     private static final String SubstitutedSql = " 'BI' = 'BI' ";
+    private static final String SubstitutedSqlVirtualData = " 1 > 2 ";
 
     @Value("${upload.file.path}")
     private String path;
@@ -318,12 +320,12 @@ public class DataSetTableService {
 
     @DeCleaner(value = DePermissionType.DATASET, key = "sceneId")
     public DatasetTable save(DataSetTableRequest datasetTable) throws Exception {
-        checkName(datasetTable);
         if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.SQL.name()) && !"appApply".equalsIgnoreCase(datasetTable.getOptFrom())) {
             DataSetTableRequest dataSetTableRequest = new DataSetTableRequest();
             BeanUtils.copyBean(dataSetTableRequest, datasetTable);
-            getSQLPreview(dataSetTableRequest);
+            getSQLPreview(dataSetTableRequest, false);
         }
+        checkName(datasetTable);
         if (StringUtils.isEmpty(datasetTable.getId())) {
             datasetTable.setId(UUID.randomUUID().toString());
             datasetTable.setCreateBy(AuthUtils.getUser().getUsername());
@@ -700,7 +702,7 @@ public class DataSetTableService {
                 datasourceRequest.setDatasource(ds);
                 DataTableInfoDTO dataTableInfo = new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class);
                 String sql = dataTableInfo.isBase64Encryption() ? new String(java.util.Base64.getDecoder().decode(dataTableInfo.getSql())) : dataTableInfo.getSql();
-                sql = handleVariableDefaultValue(sql, null, ds.getType());
+                sql = handleVariableDefaultValue(sql, datasetTable.getSqlVariableDetails(), ds.getType(), false);
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
                         qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, null, rowPermissionsTree));
@@ -712,6 +714,7 @@ public class DataSetTableService {
                 datasourceRequest.setPreviewData(true);
                 try {
                     datasourceRequest.setPageable(true);
+                    datasourceRequest.setPermissionFields(fields);
                     data.addAll(datasourceProvider.getData(datasourceRequest));
                 } catch (Exception e) {
                     logger.error(e.getMessage());
@@ -1047,7 +1050,7 @@ public class DataSetTableService {
         }
     }
 
-    public String handleVariableDefaultValue(String sql, String sqlVariableDetails, String dsType) {
+    public String handleVariableDefaultValue(String sql, String sqlVariableDetails, String dsType, boolean isEdit) {
         if (StringUtils.isEmpty(sql)) {
             DataEaseException.throwException(Translator.get("i18n_sql_not_empty"));
         }
@@ -1064,7 +1067,11 @@ public class DataSetTableService {
                         break;
                     }
                 }
-                if (defaultsSqlVariableDetail != null && StringUtils.isNotEmpty(defaultsSqlVariableDetail.getDefaultValue())) {
+                if (!isEdit && defaultsSqlVariableDetail != null && defaultsSqlVariableDetail.getDefaultValueScope() != null &&
+                        defaultsSqlVariableDetail.getDefaultValueScope().equals(SqlVariableDetails.DefaultValueScope.ALLSCOPE) && StringUtils.isNotEmpty(defaultsSqlVariableDetail.getDefaultValue())) {
+                    sql = sql.replace(matcher.group(), defaultsSqlVariableDetail.getDefaultValue());
+                }
+                if (isEdit && defaultsSqlVariableDetail != null && StringUtils.isNotEmpty(defaultsSqlVariableDetail.getDefaultValue())){
                     sql = sql.replace(matcher.group(), defaultsSqlVariableDetail.getDefaultValue());
                 }
             }
@@ -1090,7 +1097,7 @@ public class DataSetTableService {
         if (!hasVariables && !tmpSql.contains(SubstitutedParams)) {
             return tmpSql;
         }
-        CCJSqlParserUtil.parse(tmpSql, parser -> parser.withSquareBracketQuotation(true));
+
         Statement statement = CCJSqlParserUtil.parse(tmpSql);
         Select select = (Select) statement;
 
@@ -1147,8 +1154,8 @@ public class DataSetTableService {
                         subSelect.setAlias(new Alias(rightItem.getAlias().toString(), false));
                     }
                     join.setRightItem(subSelect);
-                    joinsList.add(join);
                 }
+                joinsList.add(join);
             }
             plainSelect.setJoins(joinsList);
         }
@@ -1162,8 +1169,12 @@ public class DataSetTableService {
             binaryExpression = (BinaryExpression) expr;
         } catch (Exception e) {
         }
-        if (binaryExpression != null && !(binaryExpression.getLeftExpression() instanceof BinaryExpression) && !(binaryExpression.getRightExpression() instanceof BinaryExpression) && hasVariable(binaryExpression.toString())) {
-            stringBuilder.append(SubstitutedSql);
+        if (binaryExpression != null) {
+            if (!(binaryExpression.getLeftExpression() instanceof BinaryExpression) && !(binaryExpression.getLeftExpression() instanceof InExpression) && hasVariable(binaryExpression.getRightExpression().toString())) {
+                stringBuilder.append(SubstitutedSql);
+            }else {
+                expr.accept(getExpressionDeParser(stringBuilder));
+            }
         } else {
             expr.accept(getExpressionDeParser(stringBuilder));
         }
@@ -1237,7 +1248,7 @@ public class DataSetTableService {
         return datasetSqlLogMapper.selectByExample(example);
     }
 
-    public ResultHolder getSQLPreview(DataSetTableRequest dataSetTableRequest) throws Exception {
+    public ResultHolder getSQLPreview(DataSetTableRequest dataSetTableRequest, boolean realData) throws Exception {
         DatasetSqlLog datasetSqlLog = new DatasetSqlLog();
 
         DataTableInfoDTO dataTableInfo = new Gson().fromJson(dataSetTableRequest.getInfo(), DataTableInfoDTO.class);
@@ -1248,6 +1259,9 @@ public class DataSetTableService {
             throw new Exception(Translator.get("i18n_invalid_ds"));
         }
         String tmpSql = removeVariables(sql, ds.getType());
+        if(!realData){
+            tmpSql.replaceAll(SubstitutedSql, SubstitutedSqlVirtualData);
+        }
         if (dataSetTableRequest.getMode() == 1 && (tmpSql.contains(SubstitutedParams) || tmpSql.contains(SubstitutedSql.trim()))) {
             throw new Exception(Translator.get("I18N_SQL_variable_direct_limit"));
         }
@@ -1258,8 +1272,7 @@ public class DataSetTableService {
         DatasourceRequest datasourceRequest = new DatasourceRequest();
         datasourceRequest.setDatasource(ds);
 
-
-        sql = handleVariableDefaultValue(sql, dataSetTableRequest.getSqlVariableDetails(), ds.getType());
+        sql = realData ? handleVariableDefaultValue(sql, dataSetTableRequest.getSqlVariableDetails(), ds.getType(), true) : removeVariables(sql, ds.getType()).replaceAll(SubstitutedSql.trim(), SubstitutedSqlVirtualData);
         if (StringUtils.isEmpty(sql)) {
             DataEaseException.throwException(Translator.get("i18n_sql_not_empty"));
         }
@@ -1635,7 +1648,9 @@ public class DataSetTableService {
             // field
             StringBuilder field = new StringBuilder();
             for (Map.Entry<String, String[]> next : checkedInfo.entrySet()) {
-                field.append(StringUtils.join(next.getValue(), ",")).append(",");
+                if (next.getValue().length > 0) {
+                    field.append(StringUtils.join(next.getValue(), ",")).append(",");
+                }
             }
             String f = subPrefixSuffixChar(field.toString());
             // join
@@ -1783,7 +1798,9 @@ public class DataSetTableService {
             // field
             StringBuilder field = new StringBuilder();
             for (Map.Entry<String, String[]> next : checkedInfo.entrySet()) {
-                field.append(StringUtils.join(next.getValue(), ",")).append(",");
+                if (next.getValue().length > 0) {
+                    field.append(StringUtils.join(next.getValue(), ",")).append(",");
+                }
             }
             String f = subPrefixSuffixChar(field.toString());
             // join
@@ -1925,7 +1942,7 @@ public class DataSetTableService {
             QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
             DataTableInfoDTO dataTableInfo = new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class);
             String sql = dataTableInfo.isBase64Encryption() ? new String(java.util.Base64.getDecoder().decode(dataTableInfo.getSql())) : dataTableInfo.getSql();
-            sql = handleVariableDefaultValue(sql, null, ds.getType());
+            sql = removeVariables(sql, ds.getType()).replaceAll(SubstitutedSql.trim(), SubstitutedSqlVirtualData);
             String sqlAsTable = qp.createSQLPreview(sql, null);
             datasourceRequest.setQuery(sqlAsTable);
             fields = datasourceProvider.fetchResultField(datasourceRequest);
@@ -2262,6 +2279,9 @@ public class DataSetTableService {
         }
         Set<String> nameSet = new HashSet<>();
         for (DataSetTableRequest table : datasetTable) {
+            if (StringUtils.isEmpty(table.getName())) {
+                throw new RuntimeException(Translator.get("I18n_name_cant_empty"));
+            }
             nameSet.add(table.getName());
         }
         if (nameSet.size() != datasetTable.size()) {

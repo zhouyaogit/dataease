@@ -630,7 +630,8 @@ export default {
       }
       if (this.element.auxiliaryMatrix && this.curCanvasScaleSelf) {
         const height = Math.round(this.height / this.curCanvasScaleSelf.matrixStyleHeight) * this.curCanvasScaleSelf.matrixStyleHeight
-        return (height - this.curGap * 2) + 'px'
+        const hp = (height - this.curGap * 2)
+        return (hp > 3 ? hp : 3) + 'px'
       } else {
         return (this.height - this.curGap * 2) + 'px'
       }
@@ -682,14 +683,14 @@ export default {
       return (this.canvasStyleData.panel.gap === 'yes' && this.element.auxiliaryMatrix) ? this.componentGap : 0
     },
     miniWidth() {
-      return this.element.auxiliaryMatrix ? this.curCanvasScaleSelf.matrixStyleWidth * (this.mobileLayoutStatus ? 1 : 4) : 0
+      return this.element.auxiliaryMatrix ? this.curCanvasScaleSelf.matrixStyleWidth * (this.mobileLayoutStatus ? 1 : 1) : 0
     },
     miniHeight() {
       if (this.element.auxiliaryMatrix) {
         if (this.element.component === 'de-number-range') {
-          return this.element.auxiliaryMatrix ? this.curCanvasScaleSelf.matrixStyleHeight * (this.mobileLayoutStatus ? 1 : 4) : 0
+          return this.element.auxiliaryMatrix ? this.curCanvasScaleSelf.matrixStyleHeight * (this.mobileLayoutStatus ? 1 : 1) : 0
         } else {
-          return this.element.auxiliaryMatrix ? this.curCanvasScaleSelf.matrixStyleHeight * (this.mobileLayoutStatus ? 1 : 4) : 0
+          return this.element.auxiliaryMatrix ? this.curCanvasScaleSelf.matrixStyleHeight * (this.mobileLayoutStatus ? 1 : 1) : 0
         }
       } else {
         return 0
@@ -830,6 +831,22 @@ export default {
     this.beforeDestroyFunction()
   },
   methods: {
+    sizeAdaptor() {
+      this.top = this.y
+      this.left = this.x
+      const [parentWidth, parentHeight] = this.getParentSize()
+      this.parentWidth = parentWidth
+      this.parentHeight = parentHeight
+      const [width, height] = getComputedSize(this.$el)
+      this.aspectFactor = (this.w !== 'auto' ? this.w : width) / (this.h !== 'auto' ? this.h : height)
+      if (this.outsideAspectRatio) {
+        this.aspectFactor = this.outsideAspectRatio
+      }
+      this.width = this.w !== 'auto' ? this.w : width
+      this.height = this.h !== 'auto' ? this.h : height
+      this.right = this.parentWidth - this.width - this.left
+      this.bottom = this.parentHeight - this.height - this.top
+    },
     setChartData(chart) {
       this.chart = chart
     },
@@ -1482,6 +1499,7 @@ export default {
           this.hasMove && this.$store.commit('recordSnapshot', 'handleUp')
           // 记录snapshot后 移动已记录设置为false
           this.hasMove = false
+          this.sizeAdaptor()
         }, 200)
       } else {
         this.hasMove && this.$store.commit('recordSnapshot', 'handleUp')
@@ -1890,18 +1908,7 @@ export default {
       if (!this.enableNativeDrag) {
         this.$el.ondragstart = () => false
       }
-      const [parentWidth, parentHeight] = this.getParentSize()
-      this.parentWidth = parentWidth
-      this.parentHeight = parentHeight
-      const [width, height] = getComputedSize(this.$el)
-      this.aspectFactor = (this.w !== 'auto' ? this.w : width) / (this.h !== 'auto' ? this.h : height)
-      if (this.outsideAspectRatio) {
-        this.aspectFactor = this.outsideAspectRatio
-      }
-      this.width = this.w !== 'auto' ? this.w : width
-      this.height = this.h !== 'auto' ? this.h : height
-      this.right = this.parentWidth - this.width - this.left
-      this.bottom = this.parentHeight - this.height - this.top
+      this.sizeAdaptor()
 
       // 绑定data-*属性
       this.settingAttribute()

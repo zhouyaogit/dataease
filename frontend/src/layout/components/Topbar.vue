@@ -239,6 +239,9 @@ export default {
   },
 
   mounted() {
+    window.addEventListener('beforeunload', (e) => this.beforeunloadHandler(e))
+    window.addEventListener('unload', (e) => this.unloadHandler(e))
+
     this.initCurrentRoutes()
     bus.$on('set-top-menu-info', this.setTopMenuInfo)
     bus.$on('set-top-menu-active-info', this.setTopMenuActiveInfo)
@@ -251,6 +254,9 @@ export default {
     })
   },
   beforeDestroy() {
+    window.removeEventListener('beforeunload', (e) => this.beforeunloadHandler(e))
+    window.removeEventListener('unload', (e) => this.unloadHandler(e))
+
     bus.$off('set-top-menu-info', this.setTopMenuInfo)
     bus.$off('set-top-menu-active-info', this.setTopMenuActiveInfo)
     bus.$off('set-top-text-info', this.setTopTextInfo)
@@ -269,6 +275,16 @@ export default {
     })
   },
   methods: {
+    beforeunloadHandler() {
+      this.beforeUnload_time = new Date().getTime()
+    },
+    unloadHandler(e) {
+      this.gap_time = new Date().getTime() - this.beforeUnload_time
+      if (this.gap_time <= 5) {
+        this.logout().then(res => {})
+      }
+    },
+
     // 通过当前路径找到二级菜单对应项，存到store，用来渲染左侧菜单
     initCurrentRoutes() {
       const {
@@ -365,7 +381,7 @@ export default {
       if (result !== 'success' && result !== 'fail') {
         window.location.href = result
       } else {
-        this.$router.push('/login')
+        this.$router.push(`/login?redirect=${this.$route.fullPath}`)
       }
     },
     loadUiInfo() {

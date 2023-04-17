@@ -1,6 +1,6 @@
 <template>
   <de-container
-    v-loading="$store.getters.loadingMap[$store.getters.currentPath]"
+    v-loading="$store.getters.loadingMap[$store.getters.currentPath] || linkLoading"
     :class="isAbsoluteContainer ? 'abs-container' : ''"
   >
     <de-main-container
@@ -64,7 +64,7 @@
         :enable-scroll="false"
         :chart="chartTable"
         :show-summary="false"
-        class="table-class"
+        class="table-class-dialog"
       />
     </de-main-container>
   </de-container>
@@ -87,9 +87,20 @@ import html2canvas from 'html2canvasde'
 import { hexColorToRGBA } from '@/views/chart/chart/util'
 import { deepCopy, exportImg, imgUrlTrans } from '@/components/canvas/utils/utils'
 import { getLinkToken, getToken } from '@/utils/auth'
+
 export default {
   name: 'UserViewDialog',
-  components: { LabelNormalText, ChartComponentS2, ChartComponentG2, DeMainContainer, DeContainer, ChartComponent, TableNormal, LabelNormal, PluginCom },
+  components: {
+    LabelNormalText,
+    ChartComponentS2,
+    ChartComponentG2,
+    DeMainContainer,
+    DeContainer,
+    ChartComponent,
+    TableNormal,
+    LabelNormal,
+    PluginCom
+  },
   props: {
     chart: {
       type: Object,
@@ -109,10 +120,14 @@ export default {
     return {
       refId: null,
       element: {},
-      lastMapChart: null
+      lastMapChart: null,
+      linkLoading: false
     }
   },
   computed: {
+    panelInfo() {
+      return this.$store.state.panel.panelInfo
+    },
     isAbsoluteContainer() {
       return this.showChartCanvas && this.chart.type === 'symbol-map'
     },
@@ -123,8 +138,7 @@ export default {
       return this.chart.type === 'table-normal' || this.chart.type === 'table-info'
     },
     customStyle() {
-      let style = {
-      }
+      let style = {}
       if (this.canvasStyleData.openCommonStyle) {
         if (this.canvasStyleData.panel.backgroundType === 'image' && this.canvasStyleData.panel.imageUrl) {
           style = {
@@ -186,7 +200,8 @@ export default {
       'isClickComponent',
       'curComponent',
       'componentData',
-      'canvasStyleData'
+      'canvasStyleData',
+      'lastViewRequestInfo'
     ]),
     mapChart() {
       if (this.chart.type && (this.chart.type === 'map' || this.chart.type === 'buddle-map')) {
@@ -211,7 +226,7 @@ export default {
             }
           })
         }
-        const result = { ...temp, ...{ DetailAreaCode: DetailAreaCode }}
+        const result = { ...temp, ...{ DetailAreaCode: DetailAreaCode } }
         this.setLastMapChart(result)
         return result
       }
@@ -225,28 +240,28 @@ export default {
   mounted() {
   },
   methods: {
-    exportExcel() {
+    exportExcel(callBack) {
       const _this = this
       if (this.isOnlyDetails) {
-        _this.exportExcelDownload()
+        _this.exportExcelDownload(null, null, null, callBack)
       } else {
         if (this.showChartCanvas) {
           html2canvas(document.getElementById('chartCanvas')).then(canvas => {
             const snapshot = canvas.toDataURL('image/jpeg', 1)
-            _this.exportExcelDownload(snapshot, canvas.width, canvas.height)
+            _this.exportExcelDownload(snapshot, canvas.width, canvas.height, callBack)
           })
         } else {
-          _this.exportExcelDownload()
+          _this.exportExcelDownload(null, null, null, callBack)
         }
       }
     },
-    exportViewImg() {
-      exportImg(this.chart.name)
+    exportViewImg(callback) {
+      exportImg(this.chart.name, callback)
     },
     setLastMapChart(data) {
       this.lastMapChart = JSON.parse(JSON.stringify(data))
     },
-    exportExcelDownload(snapshot, width, height) {
+    exportExcelDownload(snapshot, width, height, callBack) {
       const excelHeader = JSON.parse(JSON.stringify(this.chart.data.fields)).map(item => item.name)
       const excelTypes = JSON.parse(JSON.stringify(this.chart.data.fields)).map(item => item.deType)
       const excelHeaderKeys = JSON.parse(JSON.stringify(this.chart.data.fields)).map(item => item.dataeaseName)
@@ -277,6 +292,7 @@ export default {
         })
       }
       const request = {
+        proxy: null,
         viewId: this.chart.id,
         viewName: excelName,
         header: excelHeader,
@@ -285,6 +301,8 @@ export default {
         snapshot: snapshot,
         snapshotWidth: width,
         snapshotHeight: height,
+        componentFilterInfo: this.lastViewRequestInfo[this.chart.id],
+        excelHeaderKeys: excelHeaderKeys,
         detailFields
       }
       let method = innerExportDetails
@@ -292,6 +310,11 @@ export default {
       const linkToken = this.$store.getters.linkToken || getLinkToken()
       if (!token && linkToken) {
         method = exportDetails
+        this.linkLoading = true
+      }
+
+      if (this.panelInfo.proxy) {
+        request.proxy = { userId: this.panelInfo.proxy }
       }
       method(request).then((res) => {
         const blob = new Blob([res], { type: 'application/vnd.ms-excel' })
@@ -302,6 +325,11 @@ export default {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+        this.linkLoading = false
+        callBack && callBack()
+      }).catch(() => {
+        this.linkLoading = false
+        callBack && callBack()
       })
     },
 
@@ -313,43 +341,50 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  .ms-aside-container {
-    height: 70vh;
-    min-width: 400px;
-    max-width: 400px;
-    padding: 0 0;
-  }
-  .ms-main-container {
-    height: 70vh;
-    border: 1px solid #E6E6E6;
-  }
-  .chart-class{
-    height: 100%;
-  }
-  .table-class{
-    height: 100%;
-  }
-  .canvas-class{
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background-size: 100% 100% !important;
-  }
-  .abs-container {
-    position: absolute;
-    width: 100%;
-    margin-left: -20px;
-    .ms-main-container {
-      padding: 0px !important;
-    }
-  }
+.ms-aside-container {
+  height: 70vh;
+  min-width: 400px;
+  max-width: 400px;
+  padding: 0 0;
+}
 
-  .svg-background {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.ms-main-container {
+  height: 70vh;
+  border: 1px solid #E6E6E6;
+}
+
+.chart-class {
+  height: 100%;
+}
+
+.table-class-dialog {
+  height: 100%;
+  overflow-y: auto !important;
+}
+
+.canvas-class {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-size: 100% 100% !important;
+}
+
+.abs-container {
+  position: absolute;
+  width: 100%;
+  margin-left: -20px;
+
+  .ms-main-container {
+    padding: 0px !important;
   }
+}
+
+.svg-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
 
 </style>

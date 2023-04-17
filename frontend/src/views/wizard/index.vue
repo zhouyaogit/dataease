@@ -60,7 +60,7 @@
               <span class="content_middle_title">{{ $t('wizard.latest_developments') }}</span>
               <div class="content_middle_more"><a
                 target="_blank"
-                href="https://blog.fit2cloud.com/?cat=321"
+                href="https://blog.fit2cloud.com/categories/dataease"
               >{{ $t('wizard.more') }}<i class="el-icon-arrow-right"/></a></div>
             </el-row>
             <el-row>
@@ -119,7 +119,7 @@
               <div class="contact_title_qr">{{ $t('wizard.technical_group') }}</div>
               <img
                 class="contact_wechat_group_img"
-                src="@/assets/wizard_wechat-group.png"
+                src="../../assets/wizard_wechat-group.png"
               >
             </div>
           </div>

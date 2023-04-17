@@ -115,6 +115,7 @@
           v-if="showChartInfoType==='enlarge' && hasDataPermission('export',panelInfo.privileges)&& showChartInfo && showChartInfo.type !== 'symbol-map'"
           class="el-icon-picture-outline"
           size="mini"
+          :disabled="imageDownloading"
           @click="exportViewImg"
         >
           {{ $t('chart.export_img') }}
@@ -122,6 +123,7 @@
         <el-button
           v-if="showChartInfoType==='details'&& hasDataPermission('export',panelInfo.privileges)"
           size="mini"
+          :disabled="$store.getters.loadingMap[$store.getters.currentPath]"
           @click="exportExcel"
         >
           <svg-icon
@@ -234,6 +236,7 @@ export default {
   },
   data() {
     return {
+      imageDownloading: false,
       chartDetailsVisible: false,
       showChartInfo: {},
       showChartTableInfo: {},
@@ -366,7 +369,7 @@ export default {
     ]),
 
     searchButtonInfo() {
-      const result = this.buildButtonFilterMap(this.componentData)
+      const result = this.buildButtonFilterMap(this.$store.state.componentData)
       return result
     },
     filterMap() {
@@ -448,6 +451,26 @@ export default {
     bus.$off('trigger-reset-button', this.triggerResetButton)
   },
   methods: {
+    getWrapperChildRefs() {
+      return this.$refs['viewWrapperChild']
+    },
+    getAllWrapperChildRefs() {
+      let allChildRefs = []
+      const currentChildRefs = this.getWrapperChildRefs()
+      if (currentChildRefs && currentChildRefs.length > 0) {
+        allChildRefs.push.apply(allChildRefs, currentChildRefs)
+      }
+      currentChildRefs && currentChildRefs.forEach(subRef => {
+        if (subRef?.getType && subRef.getType() === 'de-tabs') {
+          const currentTabChildRefs = subRef.getWrapperChildRefs()
+          if (currentTabChildRefs && currentTabChildRefs.length > 0) {
+            allChildRefs.push.apply(allChildRefs, currentTabChildRefs)
+          }
+        }
+      })
+      return allChildRefs
+    },
+
     getCanvasHeight() {
       return this.mainHeightCount
     },
@@ -465,7 +488,7 @@ export default {
           activeWatermark(this.panelInfo.watermarkInfo.settingContent, this.userInfo, waterDomId, this.canvasId, this.panelInfo.watermarkOpen)
         } else {
           const method = this.userId ? proxyUserLoginInfo : userLoginInfo
-          method(this.userId).then(res => {
+          method().then(res => {
             this.userInfo = res.data
             activeWatermark(this.panelInfo.watermarkInfo.settingContent, this.userInfo, waterDomId, this.canvasId, this.panelInfo.watermarkOpen)
           })
@@ -484,12 +507,15 @@ export default {
       })
     },
     triggerSearchButton(isClear = false) {
-      const result = this.buildButtonFilterMap(this.componentData, isClear)
+      if (this.canvasId !== 'canvas-main') {
+        return
+      }
+      const result = this.buildButtonFilterMap(this.$store.state.componentData, isClear)
       this.searchButtonInfo.autoTrigger = result.autoTrigger
       this.searchButtonInfo.filterMap = result.filterMap
       this.buttonFilterMap = this.searchButtonInfo.filterMap
 
-      this.componentData.forEach(component => {
+      this.$store.state.componentData.forEach(component => {
         if (component.type === 'view' && this.buttonFilterMap[component.propValue.viewId]) {
           component.filters = this.buttonFilterMap[component.propValue.viewId]
         }
@@ -534,19 +560,20 @@ export default {
       return result
     },
     buildViewKeyFilters(panelItems, result, isClear = false) {
-      const refs = this.$refs
-      if (!this.$refs['viewWrapperChild'] || !this.$refs['viewWrapperChild'].length) return result
+      const wrapperChildAll = this.getAllWrapperChildRefs()
+      if (!wrapperChildAll || !wrapperChildAll.length) return result
       panelItems.forEach((element) => {
         if (element.type !== 'custom') {
           return true
         }
-
-        const index = this.getComponentIndex(element.id)
-        if (index < 0) {
-          return true
-        }
+        let wrapperChild
+        wrapperChildAll?.forEach(item => {
+          if (item?.['getComponentId'] && item.getComponentId() === element.id) {
+            wrapperChild = item
+          }
+        })
+        if (!wrapperChild || !wrapperChild.getCondition) return true
         let param = null
-        const wrapperChild = refs['viewWrapperChild'][index]
         if (isClear) {
           wrapperChild.clearHandler && wrapperChild.clearHandler()
         }
@@ -554,9 +581,12 @@ export default {
         const condition = formatCondition(param)
         const vValid = valueValid(condition)
         const filterComponentId = condition.componentId
+        const conditionCanvasId = wrapperChild.getCanvasId && wrapperChild.getCanvasId()
         Object.keys(result).forEach(viewId => {
           const vidMatch = viewIdMatch(condition.viewIds, viewId)
           const viewFilters = result[viewId]
+          const canvasMatch = this.checkCanvasViewIdsMatch(conditionCanvasId, viewId)
+
           let j = viewFilters.length
           while (j--) {
             const filter = viewFilters[j]
@@ -564,10 +594,20 @@ export default {
               viewFilters.splice(j, 1)
             }
           }
-          vidMatch && vValid && viewFilters.push(condition)
+          canvasMatch && vidMatch && vValid && viewFilters.push(condition)
         })
       })
       return result
+    },
+    checkCanvasViewIdsMatch(conditionCanvasId, viewId) {
+      if (conditionCanvasId === 'canvas-main') {
+        return true
+      }
+      for (let index = 0; index < this.$store.state.componentData.length; index++) {
+        const item = this.$store.state.componentData[index]
+        if (item.type === 'view' && item.propValue.viewId === viewId && item.canvasId === conditionCanvasId) return true
+      }
+      return false
     },
     getComponentIndex(id) {
       for (let index = 0; index < this.componentData.length; index++) {
@@ -660,7 +700,10 @@ export default {
       this.$refs['userViewDialog-canvas-main'].exportExcel()
     },
     exportViewImg() {
-      this.$refs['userViewDialog-canvas-main'].exportViewImg()
+      this.imageDownloading = true
+      this.$refs['userViewDialog-canvas-main'].exportViewImg(()=>{
+        this.imageDownloading = false
+      })
     },
     deselectCurComponent(e) {
       if (!this.isClickComponent) {
@@ -749,7 +792,6 @@ export default {
 <style lang="scss" scoped>
 .bg {
   min-width: 200px;
-  min-height: 300px;
   width: 100%;
   height: 100%;
   overflow-x: hidden;

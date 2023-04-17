@@ -104,9 +104,9 @@ export function getTheme(chart) {
       }
     }
   }
-  // 百分比堆叠柱状图需要取消 offset，因为在顶部类别占比较低的时候有可能会把标签挤出去
+  // 堆叠柱状图需要取消 offset，因为在顶部类别占比较低的时候有可能会把标签挤出去
   // 并且视觉上也比较不舒服
-  if (chart.type === 'percentage-bar-stack') {
+  if (equalsAny(chart.type, 'percentage-bar-stack', 'bar-group-stack')) {
     theme.innerLabels.offset = 0
   }
   return theme
@@ -200,13 +200,31 @@ export function getLabel(chart) {
                 f.formatterCfg.thousandSeparator = false
               }
               res = valueFormatter(param.value, f.formatterCfg)
-            } else if (equalsAny(chart.type, 'bar-group', 'bar-group-stack')) {
+            } else if (equalsAny(chart.type, 'bar-group')) {
               const f = yAxis[0]
               if (f.formatterCfg) {
                 res = valueFormatter(param.value, f.formatterCfg)
               } else {
                 res = valueFormatter(param.value, formatterItem)
               }
+            } else if (equalsAny(chart.type, 'bar-group-stack')) {
+              const f = yAxis[0]
+              let formatterCfg = formatterItem
+              if (f.formatterCfg) {
+                formatterCfg = f.formatterCfg
+              }
+              const labelContent = l.labelContent ?? ['quota']
+              const contentItems = []
+              if (labelContent.includes('group')) {
+                contentItems.push(param.group)
+              }
+              if (labelContent.includes('stack')) {
+                contentItems.push(param.category)
+              }
+              if (labelContent.includes('quota')) {
+                contentItems.push(valueFormatter(param.value, formatterCfg))
+              }
+              res = contentItems.join('\n')
             } else {
               for (let i = 0; i < yAxis.length; i++) {
                 const f = yAxis[i]
@@ -346,7 +364,7 @@ export function getTooltip(chart) {
                   res = valueFormatter(param.value, formatterItem)
                 }
               }
-            } else if (includesAny(chart.type, 'bar', 'line', 'scatter', 'radar', 'area') && !chart.type.includes('group')) {
+            } else if (includesAny(chart.type, 'bar', 'scatter', 'radar', 'area') && !chart.type.includes('group')) {
               obj = { name: param.category, value: param.value }
               for (let i = 0; i < yAxis.length; i++) {
                 const f = yAxis[i]
@@ -359,11 +377,32 @@ export function getTooltip(chart) {
                   break
                 }
               }
+            } else if (chart.type === 'line') {
+              obj = { name: param.category, value: param.value }
+              const xAxisExt = JSON.parse(chart.xaxisExt)
+              for (let i = 0; i < yAxis.length; i++) {
+                const f = yAxis[i]
+                if (f.name === param.category || (yAxis.length && xAxisExt.length)) {
+                  if (f.formatterCfg) {
+                    res = valueFormatter(param.value, f.formatterCfg)
+                  } else {
+                    res = valueFormatter(param.value, formatterItem)
+                  }
+                  break
+                }
+              }
             } else if (chart.type.includes('group')) {
               if (chart.type === 'bar-group') {
                 obj = { name: param.category, value: param.value }
               } else {
-                obj = { name: param.group, value: param.value }
+                let name = ''
+                if (param.group) {
+                  name = param.name + '-'
+                }
+                if (param.category) {
+                  name += param.category
+                }
+                obj = { name: name, value: param.value }
               }
               for (let i = 0; i < yAxis.length; i++) {
                 const f = yAxis[i]

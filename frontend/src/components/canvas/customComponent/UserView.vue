@@ -141,9 +141,10 @@
         style="position: absolute;right: 70px;top:15px"
       >
         <el-button
-          v-if="showChartInfoType==='enlarge' && hasDataPermission('export',panelInfo.privileges)&& showChartInfo && showChartInfo.type !== 'symbol-map'"
+          v-if="showChartInfoType==='enlarge' && hasDataPermission('export',panelInfo.privileges)&& showChartInfo && !equalsAny(showChartInfo.type, 'symbol-map', 'flow-map')"
           class="el-icon-picture-outline"
           size="mini"
+          :disabled="imageDownloading"
           @click="exportViewImg"
         >
           {{ $t('chart.export_img') }}
@@ -151,6 +152,7 @@
         <el-button
           v-if="showChartInfoType==='details' && hasDataPermission('export',panelInfo.privileges)"
           size="mini"
+          :disabled="$store.getters.loadingMap[$store.getters.currentPath] || dialogLoading"
           @click="exportExcel"
         >
           <svg-icon
@@ -216,6 +218,7 @@ import Vue from 'vue'
 import { formatterItem, valueFormatter } from '@/views/chart/chart/formatter'
 import UserViewDialog from '@/components/canvas/customComponent/UserViewDialog'
 import UserViewMobileDialog from '@/components/canvas/customComponent/UserViewMobileDialog'
+import { equalsAny } from '@/utils/StringUtils'
 
 export default {
   name: 'UserView',
@@ -306,6 +309,8 @@ export default {
   },
   data() {
     return {
+      dialogLoading: false,
+      imageDownloading: false,
       innerRefreshTimer: null,
       mobileChartDetailsVisible: false,
       chartDetailsVisible: false,
@@ -317,6 +322,7 @@ export default {
       curFields: [],
       isFirstLoad: true, // 是否是第一次加载
       refId: null,
+      getDataLoading: false,
       chart: BASE_CHART_STRING,
       requestStatus: 'success',
       message: null,
@@ -486,6 +492,7 @@ export default {
       handler: function(val1, val2) {
         if (isChange(val1, val2) && !this.isFirstLoad) {
           this.getData(this.element.propValue.viewId)
+          this.getDataLoading = true
         }
       },
       deep: true
@@ -573,6 +580,7 @@ export default {
     }
   },
   methods: {
+    equalsAny,
     tabSwitch(tabCanvasId) {
       if (this.charViewS2ShowFlag && tabCanvasId === this.canvasId && this.$refs[this.element.propValue.id]) {
         this.$refs[this.element.propValue.id].chartResize()
@@ -598,10 +606,16 @@ export default {
       }
     },
     exportExcel() {
-      this.$refs['userViewDialog'].exportExcel()
+      this.dialogLoading = true
+      this.$refs['userViewDialog'].exportExcel(() => {
+        this.dialogLoading = false
+      })
     },
     exportViewImg() {
-      this.$refs['userViewDialog'].exportViewImg()
+      this.imageDownloading = true
+      this.$refs['userViewDialog'].exportViewImg(()=>{
+        this.imageDownloading = false
+      })
     },
     pluginEditHandler(e) {
       this.$emit('trigger-plugin-edit', { e, id: this.element.id })
@@ -735,6 +749,7 @@ export default {
     },
     getData(id, cache = true, dataBroadcast = false) {
       if (id) {
+        if (this.getDataLoading) return
         this.requestStatus = 'waiting'
         this.message = null
 
@@ -759,7 +774,7 @@ export default {
           const attrSize = JSON.parse(this.view.customAttr).size
           if (this.chart.type === 'table-info' && this.view.datasetMode === 0 && (!attrSize.tablePageMode || attrSize.tablePageMode === 'page')) {
             requestInfo.goPage = this.currentPage.page
-            requestInfo.pageSize = this.currentPage.pageSize
+            requestInfo.pageSize = this.currentPage.pageSize === parseInt(attrSize.tablePageSize) ? this.currentPage.pageSize : parseInt(attrSize.tablePageSize)
           }
         }
         if (this.isFirstLoad) {
@@ -770,6 +785,9 @@ export default {
           if (response.success) {
             this.chart = response.data
             this.view = response.data
+            if (this.chart.type.includes('table')) {
+              this.$store.commit('setLastViewRequestInfo', { viewId: id, requestInfo: requestInfo })
+            }
             this.buildInnerRefreshTimer(this.chart.refreshViewEnable, this.chart.refreshUnit, this.chart.refreshTime)
             this.$emit('fill-chart-2-parent', this.chart)
             this.getDataOnly(response.data, dataBroadcast)
@@ -830,6 +848,8 @@ export default {
           }
           this.isFirstLoad = false
           return true
+        }).finally(() => {
+          this.getDataLoading = false
         })
       }
     },
@@ -912,6 +932,7 @@ export default {
       tableChart.customAttr.color.tableHeaderFontColor = '#7c7e81'
       tableChart.customAttr.color.tableFontColor = '#7c7e81'
       tableChart.customAttr.color.tableStripe = true
+      tableChart.customAttr.size.tablePageMode = 'pull'
       tableChart.customStyle.text.show = false
       tableChart.customAttr = JSON.stringify(tableChart.customAttr)
       tableChart.customStyle = JSON.stringify(tableChart.customStyle)

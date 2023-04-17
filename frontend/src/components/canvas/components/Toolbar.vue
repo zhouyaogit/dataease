@@ -154,7 +154,7 @@
               />
             </el-dropdown-item>
 
-            <el-dropdown-item>
+            <el-dropdown-item v-if="showPdfPageButton">
               <span>
                 <svg-icon
                   style="width: 16px; height: 16px;"
@@ -191,7 +191,7 @@
         @click="batchOption"
       ><span
         class="icon-font-margin"
-      >{{ $t('panel.batch_opt') }}</span></span>
+      >{{ batchOptStatus?$t('panel.cancel_batch_opt'):$t('panel.batch_opt') }}</span></span>
       <span style="float: right;margin-right: 24px">
         <el-button
           size="mini"
@@ -286,7 +286,8 @@ export default {
       scale: '100%',
       timer: null,
       changes: 0,
-      closePanelVisible: false
+      closePanelVisible: false,
+      showPdfPageButton: false
     }
   },
   computed: {

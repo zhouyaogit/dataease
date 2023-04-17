@@ -1114,6 +1114,11 @@ export default {
         }
       })
     },
+    reloadStatus(statusMap = {}) {
+      this.form.apiConfiguration.forEach(ele => {
+         ele.status = statusMap[ele.name] || ele.status
+      })
+    },
     validaDatasource() {
       if (!this.form.configuration.schema && this.form.type === 'oracle') {
         this.openMessageSuccess('datasource.please_choose_schema', 'error')
@@ -1164,6 +1169,9 @@ export default {
           data.configurationEncryption = true
           if (data.showModel === 'show' && !this.canEdit) {
             validateDsById(data.id).then((res) => {
+              if (data.type === 'api') {
+                this.reloadStatus(JSON.parse(res.data?.status || '{}'))
+              }
               if (res.success) {
                 this.openMessageSuccess('datasource.validate_success')
               } else {

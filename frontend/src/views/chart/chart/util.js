@@ -886,7 +886,8 @@ export const TYPE_CONFIGS = [
         'show',
         'fontSize',
         'color',
-        'position-v'
+        'position-v',
+        'labelContent'
       ],
       'tooltip-selector-ant-v': [
         'show',
@@ -1829,6 +1830,49 @@ export const TYPE_CONFIGS = [
       ]
     }
   },
+  {
+    render: 'antv',
+    category: 'chart.chart_type_space',
+    value: 'flow-map',
+    title: 'chart.chart_flow_map',
+    icon: 'flow-map',
+    properties: [
+      'color-selector',
+      'size-selector-ant-v',
+      'title-selector-ant-v'
+    ],
+    propertyInner: {
+      'color-selector': [
+        'alpha',
+        'mapStyle',
+        'mapLineGradient',
+        'mapLineSourceColor',
+        'mapLineTargetColor'
+      ],
+      'size-selector-ant-v': [
+        'mapPitch',
+        'mapLineType',
+        'mapLineWidth',
+        'mapLineAnimate',
+        'mapLineAnimateDuration',
+        'mapLineAnimateInterval',
+        'mapLineAnimateTrailLength',
+      ],
+      'title-selector-ant-v': [
+        'show',
+        'title',
+        'fontSize',
+        'color',
+        'hPosition',
+        'isItalic',
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
+      ]
+    }
+  },
   /* 下面是echarts图表类型 */
   {
     render: 'echarts',
@@ -1847,6 +1891,7 @@ export const TYPE_CONFIGS = [
         'tableItemBgColor',
         'tableHeaderFontColor',
         'tableFontColor',
+        'tableBorderColor',
         'tableScrollBarColor',
         'alpha'
       ],
@@ -1857,7 +1902,8 @@ export const TYPE_CONFIGS = [
         'tableItemHeight',
         'tableColumnWidth',
         'showIndex',
-        'indexLabel'
+        'indexLabel',
+        'tableAutoBreakLine'
       ],
       'title-selector': [
         'show',
@@ -1887,6 +1933,7 @@ export const TYPE_CONFIGS = [
         'tableItemBgColor',
         'tableHeaderFontColor',
         'tableFontColor',
+        'tableBorderColor',
         'tableScrollBarColor',
         'alpha'
       ],
@@ -1899,7 +1946,8 @@ export const TYPE_CONFIGS = [
         'tableItemHeight',
         'tableColumnWidth',
         'showIndex',
-        'indexLabel'
+        'indexLabel',
+        'tableAutoBreakLine'
       ],
       'title-selector': [
         'show',
@@ -3172,7 +3220,7 @@ export const TYPE_CONFIGS = [
     category: 'chart.chart_type_space',
     value: 'map',
     title: 'chart.chart_map',
-    icon: 'map',
+    icon: 'map_mini',
     properties: [
       'color-selector',
       'label-selector',
@@ -3319,19 +3367,21 @@ export function getColors(chart, colors, reset) {
     }
   } else if (equalsAny(chart.type, 'bar-group', 'line')) {
     // 拿到data中的category，并去重，然后构建seriesColor
-    const data = chart.data.data
-    const s = []
-    data.forEach((cur) => {
-      if (s.indexOf(cur.category) < 0) {
-        s.push(cur.category)
-      }
-    })
-    for (let i = 0; i < s.length; i++) {
-      seriesColors.push({
-        name: s[i],
-        color: colors[i % colors.length],
-        isCustom: false
+    if (chart.data) {
+      const data = chart.data.data
+      const s = []
+      data.forEach((cur) => {
+        if (s.indexOf(cur.category) < 0) {
+          s.push(cur.category)
+        }
       })
+      for (let i = 0; i < s.length; i++) {
+        seriesColors.push({
+          name: s[i],
+          color: colors[i % colors.length],
+          isCustom: false
+        })
+      }
     }
   } else {
     if (chart.data) {

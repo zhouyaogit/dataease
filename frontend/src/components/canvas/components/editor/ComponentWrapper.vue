@@ -1,7 +1,7 @@
 <template>
   <div
     :style="getOutStyleDefault(config.style)"
-    class="component"
+    class="component component-outer"
     @click="handleClick"
     @mousedown="elementMouseDown"
   >
@@ -223,10 +223,18 @@ export default {
     runAnimation(this.$el, this.config.animations)
   },
   methods: {
-    setChartData(chart) {
-      this.chart = chart
+    getComponentId() {
+      return this.config.id
     },
-    getStyle,
+    getCanvasId() {
+      return this.canvasId
+    },
+    getType() {
+      return this.config.type
+    },
+    getWrapperChildRefs() {
+      return this.$refs.wrapperChild.getWrapperChildRefs()
+    },
     getShapeStyleIntDeDrag(style, prop) {
       if (prop === 'rotate') {
         return style['rotate']
@@ -337,8 +345,7 @@ export default {
 .component {
   position: absolute;
 }
-
-.component:hover {
+.component-outer:hover {
   box-shadow: 0px 0px 3px #0a7be0;
 }
 

@@ -118,13 +118,16 @@
         v-loading="$store.getters.loadingMap[$store.getters.currentPath]"
         :table-data="data"
         :columns="checkedColumnNames"
+        current-row-key="email"
         :pagination="paginationConfig"
+        @columnsChange="columnsChange"
         @sort-change="sortChange"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
       >
         <el-table-column
           prop="username"
+          key="username"
           label="ID"
         />
         <el-table-column
@@ -137,6 +140,7 @@
         <!-- <el-table-column prop="gender" :label="$t('commons.gender')" width="60" /> -->
         <el-table-column
           prop="from"
+          key="from"
           :label="$t('user.source')"
           width="80"
         >
@@ -237,6 +241,7 @@
         </el-table-column>
 
         <el-table-column
+          key="__operation"
           slot="__operation"
           :label="$t('commons.operating')"
           fixed="right"
@@ -256,7 +261,7 @@
               popper-class="reset-pwd"
               trigger="click"
             >
-              <i class="el-icon-warning" />
+              <svg-icon class="reset-pwd-icon" icon-class="icon_info_filled" />
               <div class="tips">{{ $t('user.recover_pwd') }}</div>
               <div class="editer-form-title">
                 <span
@@ -554,6 +559,13 @@ export default {
         this.showScroll = dom && dom.scrollWidth > dom.offsetWidth
       })
     },
+    columnsChange() {
+      const arr = this.data
+      this.data = []
+      this.$nextTick(() => {
+        this.data = arr
+      })
+    },
     search() {
       const param = {
         orders: formatOrders(this.orderConditions),
@@ -669,6 +681,10 @@ export default {
 }
 </style>
 <style lang="scss">
+.reset-pwd-icon {
+  margin-top: 4px;
+  color: rgb(255, 153, 0);
+}
 .reset-pwd {
   padding: 20px 24px !important;
   display: flex;
@@ -753,6 +769,7 @@ export default {
   }
 }
 .de-one-line {
+  max-width: 80px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

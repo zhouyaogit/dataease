@@ -1,5 +1,6 @@
 <template>
   <el-dialog
+    v-loading="loading"
     :title="formType == 'add' ? $t('user.create') : $t('user.modify')"
     :visible.sync="dialogVisible"
     class="user-editer-form"
@@ -229,6 +230,7 @@ import { pluginLoaded, defaultPwd, wecomStatus, dingtalkStatus, larkStatus } fro
 export default {
   data() {
     return {
+      loading: false,
       defaultProps: {
         children: 'children',
         label: 'label',
@@ -413,9 +415,16 @@ export default {
       }
     },
     phoneRegex(rule, value, callback) {
+      if (!value || !`${value}`.trim()) {
+        callback()
+        return
+      }
       const regep = new RegExp(/^1[3-9]\d{9}$/)
-
-      if (!regep.test(value)) {
+      let phoneNumber = value
+      if (value.length > 3 && value.startsWith('+86')) {
+        phoneNumber = value.substr(3)
+      }
+      if (!regep.test(phoneNumber)) {
         const msg = this.$t('user.phone_format')
         callback(new Error(msg))
       } else {
@@ -549,12 +558,14 @@ export default {
     save() {
       this.$refs.createUserForm.validate((valid) => {
         if (valid) {
-          // !this.form.deptId && (this.form.deptId = 0)
+          this.loading = true
           const method = this.formType === 'add' ? addUser : editUser
           method(this.form).then((res) => {
             this.$success(this.$t('commons.save_success'))
             this.reset()
             this.$emit('saved')
+          }).finally(() => {
+            this.loading = false
           })
         } else {
           return false

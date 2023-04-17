@@ -94,7 +94,11 @@ public class JdbcProvider extends DefaultJdbcProvider {
                     tableNamePattern = String.format(MySQLConstants.KEYWORD_TABLE, tableNamePattern);
                 }
             }
-            ResultSet resultSet = databaseMetaData.getColumns(null, "%", tableNamePattern, "%");
+            String schemaPattern = "%";
+            if (datasourceRequest.getDatasource().getType().equalsIgnoreCase(DatasourceTypes.oracle.name())) {
+                schemaPattern = databaseMetaData.getUserName();
+            }
+            ResultSet resultSet = databaseMetaData.getColumns(null, schemaPattern, tableNamePattern, "%");
             while (resultSet.next()) {
                 String tableName = resultSet.getString("TABLE_NAME");
                 String database;
@@ -777,6 +781,16 @@ public class JdbcProvider extends DefaultJdbcProvider {
             case StarRocks:
                 MysqlConfiguration mysqlConfiguration = new Gson().fromJson(datasource.getConfiguration(), MysqlConfiguration.class);
                 mysqlConfiguration.getJdbc();
+                break;
+            case redshift:
+                RedshiftConfiguration redshiftConfiguration = new Gson().fromJson(datasource.getConfiguration(), RedshiftConfiguration.class);
+                if(redshiftConfiguration.getDataBase().length() > 64 || redshiftConfiguration.getDataBase().length() < 1){
+                    throw new Exception("Invalid database name");
+                }
+                if(!redshiftConfiguration.getDataBase().matches("\"^[a-z][a-z0-9_+.@-]*$\"")){
+                    throw new Exception("Invalid database name");
+                }
+                break;
             default:
                 break;
         }

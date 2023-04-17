@@ -1,3 +1,5 @@
+import { $confirm } from '@/utils/message'
+
 export default {
   fu: {
     search_bar: {
@@ -381,6 +383,7 @@ export default {
     thumbnail: '缩略图',
     confirm_delete: '确认删除',
     delete_this_dashboard: '确认删除该仪表板吗?',
+    delete_this_folder: '确认删除该目录吗?',
     confirm_stop: '确认停止',
     stop_success: '停止成功',
     treeselect: {
@@ -605,7 +608,8 @@ export default {
     oidc: 'OIDC设置',
     theme: '主题设置',
     cas: 'CAS设置',
-    map: '地图设置'
+    map: '地图设置',
+    select_left: '请在左侧选择区域'
   },
   license: {
     i18n_no_license_record: '没有 License 记录',
@@ -1509,18 +1513,57 @@ export default {
     p_right: '右对齐',
     p_top: '上对齐',
     p_bottom: '下对齐',
-    p_center: '居中'
+    p_center: '居中',
+    table_auto_break_line: '自动换行',
+    table_break_line_tip: '开启自动换行，表格行高设置将失效',
+    step: '步长(px)',
+    no_function: '函数尚未支持直接引用，请在字段表达式中手动输入。',
+    chart_flow_map: '流向地图',
+    start_point: '起点经纬度',
+    end_point: '终点经纬度',
+    line: '线条',
+    map_style: '风格',
+    map_pitch: '倾角',
+    map_rotation: '旋转',
+    map_style_normal: '标准',
+    map_style_light: '明亮',
+    map_style_dark: '暗黑',
+    map_style_whitesmoke: '远山黛',
+    map_style_fresh: '草色青',
+    map_style_grey: '雅士灰',
+    map_style_graffiti: '涂鸦',
+    map_style_macaron: '马卡龙',
+    map_style_blue: '靛青蓝',
+    map_style_darkblue: '极夜蓝',
+    map_style_wine: '酱籽',
+    map_line_type: '类型',
+    map_line_width: '线条宽度',
+    map_line_height: '线条高度',
+    map_line_linear: '渐变',
+    map_line_animate: '动画',
+    map_line_animate_duration: '动画间隔',
+    map_line_animate_interval: '轨迹间隔',
+    map_line_animate_trail_length: '轨迹长度',
+    map_line_type_line: '直线',
+    map_line_type_arc: '弧线',
+    map_line_type_arc_3d: '3D 弧线',
+    map_line_type_great_circle: '大圆弧',
+    map_line_color_source_color: '起始颜色',
+    map_line_color_target_color: '结束颜色',
+    map_line_theta_offset: '弧度'
   },
   dataset: {
+    scope_edit: '仅编辑时生效',
+    scope_all: '数据集预览时全局生效',
     spend_time: '耗时',
     sql: 'SQL 语句',
     sql_result: '运行结果',
     parse_filed: '解析字段',
     field_rename: '字段重命名',
-    params_work: '仅在编辑sql时生效',
+    params_work: '仅编辑时生效：参数值仅在数据集编辑时生效；全局生效：在数据集查看、预览、以及用到数据集的视图中均生效。',
     select_year: '选择年',
     sql_variable_limit_1: '1、SQL 变量只能在 WHERE 条件中使用',
-    sql_variable_limit_2: '2、示例：select * from table_name where column_name1=\'${param_name1}\' and column_name2 in \'${param_name2}\'',
+    sql_variable_limit_2: '2、示例：select * from table_name where column_name1=\'${param_name1}\' and column_name2 in ${param_name2}',
     select_month: '选择月',
     select_date: '选择日期',
     select_time: '选择时间',
@@ -1877,7 +1920,7 @@ export default {
     all_compute_mode: '直连、抽取模式',
     extra_params: '额外的JDBC连接字符串',
     please_input_dataPath: '请输入 JsonPath 数据路径',
-    show_api_data: '查看API原始数据',
+    show_api_data: '查看API数据结构',
     warning: '包含无效数据表',
     data_table: '数据表',
     data_table_name: '数据表名称',
@@ -1893,6 +1936,8 @@ export default {
     jsonpath_info: '请填入JsonPath',
     req_param: '请求参数',
     headers: '请求头',
+    query_param: "QUERY參數",
+    query_info: "地址栏中跟在？后面的参数,如: updateapi?id=112",
     key: '键',
     value: '值',
     data_path: '提取数据',
@@ -1969,6 +2014,7 @@ export default {
     position_adjust_component: '位置调整',
     active_font_size: '选中字体大小',
     carousel: '轮播',
+    enable_carousel: '启用轮播',
     switch_time: '切换时间',
     position_adjust: '位置',
     space_top: '上',
@@ -2046,6 +2092,7 @@ export default {
     multiplexing: '复用',
     panel_off: '仪表板已下架',
     batch_opt: '批量操作',
+    cancel_batch_opt: '退出批量操作',
     edit_leave_tips: '是否放弃编辑离开当前界面？',
     hyperlinks: '超链接',
     is_live: '是否直播',
@@ -2310,7 +2357,13 @@ export default {
     fold: '收起',
     expand: '展开',
     pdf_export: 'PDF 导出',
-    switch_pdf_template: '切换 PDF 模板'
+    switch_pdf_template: '切换 PDF 模板',
+    pdf_template_with_params: '默认模板(加参数样式)',
+    pdf_template_only_pic: '默认模板(只截图)',
+    panel_name: '仪表板名称',
+    export_user: '导出用户',
+    export_time: '导出时间',
+    you_can_type_here: '可以在这里输入其他内容'
   },
   plugin: {
     local_install: '本地安装',
@@ -2531,7 +2584,7 @@ export default {
     please_key_max: '请输入最大值',
     out_of_min: '最小值不能小于最小整数-2³²',
     out_of_max: '最大值不能大于最大整数2³²-1',
-    must_int: '请输入整数',
+    must_int: '请输入数字',
     min_out_max: '最小值必须小于最大值',
     max_out_min: '最大值必须大于最小值'
   },
@@ -2852,5 +2905,14 @@ export default {
     reset: '重置',
     preview: '预览',
     save: '保存'
+  },
+  multi_login_lang: {
+    title: '当前账号已在线！',
+    ip: 'IP',
+    time: '登录时间',
+    label: '禁止多端登录！',
+    confirm_title: '强行登录会导致其他客户端掉线',
+    confirm: '是否强行登录？',
+    forced_offline: '`当前账号在客户端【${ip}】登录，您已被挤下线！`'
   }
 }

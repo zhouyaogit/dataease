@@ -63,6 +63,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -284,7 +286,6 @@ public class DatasourceService {
         datasource.setUpdateTime(System.currentTimeMillis());
         Provider datasourceProvider = ProviderFactory.getProvider(updataDsRequest.getType());
         datasourceProvider.checkConfiguration(datasource);
-        checkAndUpdateDatasourceStatus(datasource);
         updateDatasource(updataDsRequest.getId(), datasource);
     }
 
@@ -292,8 +293,31 @@ public class DatasourceService {
     public void updateDatasource(String id, Datasource datasource) {
         DatasourceExample example = new DatasourceExample();
         example.createCriteria().andIdEqualTo(id);
+        checkAndUpdateDatasourceStatus(datasource);
         datasourceMapper.updateByExampleSelective(datasource, example);
         handleConnectionPool(id);
+
+        if (datasource.getType().equalsIgnoreCase("api")) {
+            DatasetTableExample datasetTableExample = new DatasetTableExample();
+            datasetTableExample.createCriteria().andDataSourceIdEqualTo(id);
+            List<DatasetTable> datasetTables = datasetTableMapper.selectByExample(datasetTableExample);
+            List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasource.getConfiguration(), new TypeToken<List<ApiDefinition>>() {}.getType());
+            apiDefinitionList.forEach(apiDefinition -> {
+                if(apiDefinition.isReName()){
+                    datasetTables.forEach(datasetTable -> {
+                        if(new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class).getTable().equals(apiDefinition.getOrgName())){
+                            DatasetTable record = new DatasetTable();
+                            DataTableInfoDTO dataTableInfoDTO = new DataTableInfoDTO();
+                            dataTableInfoDTO.setTable(apiDefinition.getName());
+                            record.setInfo(new Gson().toJson(dataTableInfoDTO));
+                            datasetTableExample.clear();
+                            datasetTableExample.createCriteria().andIdEqualTo(datasetTable.getId());
+                            datasetTableMapper.updateByExampleSelective(record, datasetTableExample);
+                        }
+                    });
+                }
+            });
+        }
     }
 
     private void handleConnectionPool(String datasourceId) {
@@ -339,6 +363,7 @@ public class DatasourceService {
 
                 datasourceDTO.setApiConfiguration(apiDefinitionListWithStatus);
                 if (success == apiDefinitionList.size()) {
+                    datasource.setStatus(datasourceStatus);
                     return ResultHolder.success(datasourceDTO);
                 }
                 if (success > 0 && success < apiDefinitionList.size()) {
@@ -363,7 +388,6 @@ public class DatasourceService {
             DatasourceRequest datasourceRequest = new DatasourceRequest();
             datasourceRequest.setDatasource(datasource);
             datasourceStatus = datasourceProvider.checkStatus(datasourceRequest);
-
             if (datasource.getType().equalsIgnoreCase("api")) {
                 List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasource.getConfiguration(), new TypeToken<List<ApiDefinition>>() {
                 }.getType());
@@ -377,6 +401,7 @@ public class DatasourceService {
                     }
                 }
                 if (success == apiDefinitionList.size()) {
+                    datasource.setStatus(datasourceStatus);
                     return ResultHolder.success(datasource);
                 }
                 if (success > 0 && success < apiDefinitionList.size()) {
@@ -621,6 +646,27 @@ public class DatasourceService {
     public void initDsCheckJob() {
         BasicInfo basicInfo = systemParameterService.basicInfo();
         addJob(basicInfo.getDsCheckIntervalType(), Integer.valueOf(basicInfo.getDsCheckInterval()));
+    }
+
+    public void updateDemoDs() {
+        Datasource datasource = datasourceMapper.selectByPrimaryKey("76026997-94f9-4a35-96ca-151084638969");
+        if(datasource == null){
+            return;
+        }
+        MysqlConfiguration mysqlConfiguration = new Gson().fromJson(datasource.getConfiguration(), MysqlConfiguration.class);
+        Pattern WITH_SQL_FRAGMENT = Pattern.compile("jdbc:mysql://(.*):(\\d+)/(.*)");
+        Matcher matcher = WITH_SQL_FRAGMENT.matcher(env.getProperty("spring.datasource.url"));
+        if (!matcher.find()) {
+            return;
+        }
+        mysqlConfiguration.setHost(matcher.group(1));
+        mysqlConfiguration.setPort(Integer.valueOf(matcher.group(2)));
+        mysqlConfiguration.setDataBase(matcher.group(3).split("\\?")[0]);
+        mysqlConfiguration.setExtraParams(matcher.group(3).split("\\?")[1]);
+        mysqlConfiguration.setUsername(env.getProperty("spring.datasource.username"));
+        mysqlConfiguration.setPassword(env.getProperty("spring.datasource.password"));
+        datasource.setConfiguration(new Gson().toJson(mysqlConfiguration));
+        datasourceMapper.updateByPrimaryKeyWithBLOBs(datasource);
     }
 
 }

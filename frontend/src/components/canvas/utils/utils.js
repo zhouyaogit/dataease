@@ -8,8 +8,9 @@ import {
 import { ApplicationContext } from '@/utils/ApplicationContext'
 import { uuid } from 'vue-uuid'
 import store from '@/store'
-import { AIDED_DESIGN, MOBILE_SETTING, PANEL_CHART_INFO, TAB_COMMON_STYLE, PAGE_LINE_DESIGN } from '@/views/panel/panel'
+import { AIDED_DESIGN, MOBILE_SETTING, PAGE_LINE_DESIGN, PANEL_CHART_INFO, TAB_COMMON_STYLE } from '@/views/panel/panel'
 import html2canvas from 'html2canvasde'
+import xssCheck from 'xss'
 
 export function deepCopy(target) {
   if (typeof target === 'object' && target !== null) {
@@ -101,6 +102,9 @@ export function panelDataPrepare(componentData, componentStyle, callback) {
     componentStyle.chartCommonStyle = deepCopy(COMMON_BACKGROUND)
   }
   componentData.forEach((item, index) => {
+    if (item.component && item.component === 'v-text') {
+      item.propValue = xssCheck(item.propValue)
+    }
     if (item.component && item.component === 'de-date') {
       const widget = ApplicationContext.getService(item.serviceName)
       if (item.options.attrs &&
@@ -208,7 +212,7 @@ export function checkViewTitle(opt, id, tile) {
   }
 }
 
-export function exportImg(imgName) {
+export function exportImg(imgName,callback) {
   const canvasID = document.getElementById('chartCanvas')
   const a = document.createElement('a')
   html2canvas(canvasID).then(canvas => {
@@ -223,6 +227,9 @@ export function exportImg(imgName) {
     a.click()
     URL.revokeObjectURL(blob)
     document.body.removeChild(a)
+    callback()
+  }).catch(() => {
+    callback()
   })
 }
 
@@ -270,4 +277,146 @@ export function findCurComponentIndex(componentData, curComponent) {
     }
   }
   return curIndex
+}
+
+export function deleteTreeNode(nodeId, tree, nodeTarget) {
+  if (!nodeId || !tree || !tree.length) {
+    return
+  }
+  for (let i = 0, len = tree.length; i < len; i++) {
+    if (tree[i].id === nodeId) {
+      if (nodeTarget) {
+        nodeTarget['target'] = tree[i]
+      }
+      tree.splice(i, 1)
+      return
+    } else if (tree[i].children && tree[i].children.length) {
+      deleteTreeNode(nodeId, tree[i].children, nodeTarget)
+    }
+  }
+}
+
+export function moveTreeNode(nodeInfo, tree) {
+  const nodeTarget = { target: null }
+  deleteTreeNode(nodeInfo.id, tree, nodeTarget)
+  if (nodeTarget.target) {
+    nodeTarget.target.pid = nodeInfo.pid
+    insertTreeNode(nodeTarget.target, tree)
+  }
+}
+
+export function updateTreeNode(nodeInfo, tree) {
+  if (!nodeInfo) {
+    return
+  }
+  for (let i = 0, len = tree.length; i < len; i++) {
+    if (tree[i].id === nodeInfo.id) {
+      tree[i].name = nodeInfo.name
+      tree[i].label = nodeInfo.label
+      if (tree[i].isDefault) {
+        tree[i].isDefault = nodeInfo.isDefault
+      }
+      return
+    } else if (tree[i].children && tree[i].children.length) {
+      updateTreeNode(nodeInfo, tree[i].children)
+    }
+  }
+}
+
+export function toDefaultTree(nodeId, tree) {
+  if (!nodeId) {
+    return
+  }
+  for (let i = 0, len = tree.length; i < len; i++) {
+    if (tree[i].id === nodeId) {
+      tree[i].isDefault = true
+      return
+    } else if (tree[i].children && tree[i].children.length) {
+      toDefaultTree(nodeId, tree[i].children)
+    }
+  }
+}
+
+export function insertTreeNode(nodeInfo, tree) {
+  if (!nodeInfo) {
+    return
+  }
+  if (nodeInfo.pid === 0 || nodeInfo.pid === '0') {
+    tree.push(nodeInfo)
+    return
+  }
+  for (let i = 0, len = tree.length; i < len; i++) {
+    if (tree[i].id === nodeInfo.pid) {
+      if (!tree[i].children) {
+        tree[i].children = []
+      }
+      tree[i].children.push(nodeInfo)
+      return
+    } else if (tree[i].children && tree[i].children.length) {
+      insertTreeNode(nodeInfo, tree[i].children)
+    }
+  }
+}
+
+export function insertBatchTreeNode(nodeInfoArray, tree) {
+  if (!nodeInfoArray || nodeInfoArray.size === 0) {
+    return
+  }
+  const pid = nodeInfoArray[0].pid
+  for (let i = 0, len = tree.length; i < len; i++) {
+    if (tree[i].id === pid) {
+      if (!tree[i].children) {
+        tree[i].children = []
+      }
+      tree[i].children = tree[i].children.concat(nodeInfoArray)
+      return
+    } else if (tree[i].children && tree[i].children.length) {
+      insertBatchTreeNode(nodeInfoArray, tree[i].children)
+    }
+  }
+}
+
+export function updateCacheTree(opt, treeName, nodeInfoFull, tree) {
+  const nodeInfo = deepCopy(nodeInfoFull)
+  if( nodeInfo instanceof Array){
+    nodeInfo.forEach(item=>{
+      delete item.panelData
+      delete item.panelStyle
+    })
+  }else{
+    delete nodeInfo.panelData
+    delete nodeInfo.panelStyle
+  }
+  if (opt === 'new' || opt === 'copy') {
+    insertTreeNode(nodeInfo, tree)
+  } else if (opt === 'move') {
+    moveTreeNode(nodeInfo, tree)
+  } else if (opt === 'rename') {
+    updateTreeNode(nodeInfo, tree)
+  } else if (opt === 'delete') {
+    deleteTreeNode(nodeInfo, tree)
+  } else if (opt === 'newFirstFolder') {
+    tree.push(nodeInfo)
+  } else if (opt === 'batchNew') {
+    insertBatchTreeNode(nodeInfo, tree)
+  } else if (opt === 'toDefaultPanel') {
+    toDefaultTree(nodeInfo.source, tree)
+  }
+  localStorage.setItem(treeName, JSON.stringify(tree))
+}
+
+export function formatDatasetTreeFolder(tree) {
+  if (tree && tree.length) {
+    for (let len = tree.length - 1; len > -1; len--) {
+      if (tree[len].modelInnerType !== 'group') {
+        tree.splice(len, 1)
+      } else if (tree[len].children && tree[len].children.length) {
+        formatDatasetTreeFolder(tree[len].children)
+      }
+    }
+  }
+}
+
+export function getCacheTree(treeName) {
+  return JSON.parse(localStorage.getItem(treeName))
 }

@@ -1,5 +1,7 @@
 <template>
-  <div id="main" :style="chartSize"></div>
+  <div :style="chartSize">
+    <div id="main" :style="chartSizeMax"></div>
+  </div>
 </template>
 
 <script>
@@ -20,6 +22,7 @@ export default {
     return {
       measureText: null,
       current: {},
+      maxSize: 0,
       activeId: '',
       treeData: [],
       myChart: null,
@@ -30,12 +33,27 @@ export default {
       }
     }
   },
+  computed: {
+    chartSizeMax() {
+      const { height } = this.chartSize
+      return this.maxSize > parseInt(height)/25  ? {
+        height: this.maxSize * 25  + 'px',
+        width: this.chartSize.width
+      } : this.chartSize
+    }
+  },
   watch: {
     chartSize: {
-      handler(val) {
-        if (this.myChart) {
-          this.myChart.resize(val)
-        }
+      handler() {
+        this.initEchart()
+      },
+      deep: true
+    },
+    chartSizeMax: {
+      handler() {
+        setTimeout(() => {
+          this.initEchart()
+        }, 1000)
       },
       deep: true
     }
@@ -228,7 +246,7 @@ export default {
       }
 
       const { queryType, num, label } = this.current
-      max[queryType] = ctx.measureText(label).width + 10
+      max[queryType] = ctx.measureText(label).width + 30
 
       if (!arr.length)
         return [
@@ -242,7 +260,7 @@ export default {
 
       arr.forEach((ele, index) => {
         const { id, name, type, pid } = ele
-        let width = ctx.measureText(name).width + 10
+        let width = ctx.measureText(name).width + 30
         max[type] = Math.max(width, max[type])
         dataItemList.push([width, id, name, type, pid])
       })
@@ -320,11 +338,13 @@ export default {
       }
       return [list, gap]
     },
-    initEchart() {
+    initEchart(clickNode = []) {
+      if (!this.treeData.length) return
       if (this.myChart) {
         this.myChart.dispose()
         this.myChart = null
       }
+
       this.myChart = echarts.init(document.getElementById('main'))
       const that = this
       let [data, gap] = this.calculatedWidth(this.treeData)
@@ -337,6 +357,32 @@ export default {
       gapDetail[this.current.queryType] = 0
       let lineData = this.calculatedLine(data)
       data = this.deleteRepeat(data)
+
+      const lineEnd = [clickNode[0]]
+      lineData = lineData.map(ele => {
+        let arr = [...ele]
+        if (clickNode[0] === ele[0]) {
+          arr.push(1)
+          lineEnd.push(ele[3])
+        } else if(clickNode[0] === ele[3]) {
+          arr.push(1)
+          lineEnd.push(ele[0])
+        } else {
+          arr.push(0)
+        }
+        return arr
+      })
+
+      data = data.map(ele => {
+        let arr = [...ele]
+        arr.push(Boolean(lineEnd.includes(ele[0])))
+        return arr
+      })
+      
+      if (this.maxSize !== data.length) {
+        this.maxSize = data.length
+        return
+      }
       let option = {
         xAxis: {
           show: false, //不显示分隔线,
@@ -378,6 +424,14 @@ export default {
               let startPoint = api.coord([api.value(1), categoryIndex])
               let width = api.value(3)
               let height = 22
+
+              const imageType = {
+                datasource: '/static/svg/de-datasource.svg',
+                panel: '/static/svg/de-dashboard.svg',
+                dataset: '/static/svg/de-dataset.svg'
+              }
+
+              
               return {
                 type: 'group', //当需要多个自定义拼接时，需要用group，此案例是文字和图形的拼接
                 children: [
@@ -391,8 +445,21 @@ export default {
                     style: {
                       text: isNaN(api.value(5)) ? data.find(ele => ele[4] === api.value(4))[5] : api.value(5), //data中取值
                       color: '#1F2329',
-                      x: 5,
+                      x: 25,
                       y: 5
+                    }
+                  },
+                  {
+                    type: 'image',
+                    x: startPoint[0] + gapDetail[api.value(6)],
+                    y: startPoint[1] - height / 2,
+                    z2: 20,
+                    style: {
+                      image: imageType[api.value(6)],
+                      width: 15,
+                      height: 15,
+                      x: 5,
+                      y: 3.5
                     }
                   },
                   {
@@ -421,7 +488,7 @@ export default {
                     style: {
                       ...api.style(),
                       fill: api.value(4) === that.activeId ? '#c2d4ff' : 'none',
-                      stroke: '#3370FF'
+                      stroke: api.value(8) ? 'green' : '#3370FF'
                     }
                   }
                 ]
@@ -465,17 +532,22 @@ export default {
                 type: 'group', //当需要多个自定义拼接时，需要用group，此案例是文字和图形的拼接
                 children: [
                   {
-                    type: 'line',
+                    type: 'bezierCurve',
                     silent: true,
                     shape: {
                       x1,
                       y1: startPoint[1],
                       x2: endPoint[0] + gapDetail[api.value(5)],
                       y2: endPoint[1],
+                      cpx1:endPoint[0] + gapDetail[api.value(5)] - 50,
+                      cpx2:endPoint[0] + gapDetail[api.value(5)] - 10,
+                      cpy1:endPoint[1],
+                      cpy2:endPoint[1],
                       percent: 1
                     },
                     style: {
-                      stroke: '#3370FF',
+                      stroke: api.value(7) ? 'green' : '#3370FF',
+                      fill: 'transparent',
                       lineWidth: 1
                     }
                   }
@@ -487,6 +559,9 @@ export default {
         ]
       }
       this.myChart.setOption(option, true)
+      this.myChart.on('click', function (params) {
+          that.initEchart(params.value)
+      });
     }
   }
 }

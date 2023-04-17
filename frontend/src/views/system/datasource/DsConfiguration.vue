@@ -71,7 +71,7 @@
                     popper-class="api-table-delete"
                     trigger="click"
                   >
-                    <i :disabled="disabled" class="el-icon-warning" />
+                    <svg-icon :disabled="disabled" icon-class="icon_info_filled" />
                     <div class="tips">
                       {{ $t('datasource.delete_this_item') }}
                     </div>
@@ -583,8 +583,7 @@
                 class-name="checkbox-table"
                 prop="originName"
                 :label="$t('dataset.parse_filed')"
-                :show-overflow-tooltip="true"
-                width="255"
+                show-overflow-tooltip
               >
                 <template slot-scope="scope">
                   {{ scope.row.originName }}
@@ -994,6 +993,7 @@ export default {
         method: 'GET',
         request: {
           headers: [{}],
+          arguments: [],
           body: {
             type: '',
             raw: '',
@@ -1010,6 +1010,7 @@ export default {
         dataPath: '',
         request: {
           headers: [],
+          arguments: [],
           body: {
             type: '',
             raw: '',
@@ -1143,6 +1144,7 @@ export default {
           this.$message.error(i18n.t('datasource.please_input_dataPath'))
           return
         }
+        this.originFieldItem.jsonFields = []
         this.$refs.apiItemBasicInfo.validate((valid) => {
           if (valid) {
             const data = Base64.encode(JSON.stringify(this.apiItem))
@@ -1158,9 +1160,7 @@ export default {
                 this.apiItem.jsonFields = res.data.jsonFields
                 this.apiItem.fields = []
                 this.handleFiledChange(this.apiItem)
-                this.$nextTick(() => {
-                  this.$refs.plxTable?.reloadData(this.previewData(this.apiItem))
-                })
+                this.previewData(this.apiItem)
               })
               .catch((res) => {
                 this.loading = false
@@ -1174,10 +1174,6 @@ export default {
       }
     },
     showApiData(){
-      if (this.apiItem.useJsonPath && !this.apiItem.jsonPath) {
-        this.$message.error(i18n.t('datasource.please_input_dataPath'))
-        return
-      }
       this.$refs.apiItemBasicInfo.validate((valid) => {
         if (valid) {
           const data = Base64.encode(JSON.stringify(this.apiItem))
@@ -1187,7 +1183,7 @@ export default {
               res.data.jsonFields.forEach(((item) => {
                 item.checked = false
               }))
-             this.originFieldItem.jsonFields = res.data.jsonFields
+              this.originFieldItem.jsonFields = res.data.jsonFields
               this.loading = false
               this.$success(i18n.t('commons.success'))
             })
@@ -1228,14 +1224,15 @@ export default {
       this.edit_api_item = false
       if (!this.add_api_item) {
         for (let i = 0; i < this.form.apiConfiguration.length; i++) {
-          if (
-            this.form.apiConfiguration[i].serialNumber ===
-            this.apiItem.serialNumber
-          ) {
-            this.form.apiConfiguration[i] = JSON.parse(
-              JSON.stringify(this.apiItem)
-            )
+          if (this.form.apiConfiguration[i].serialNumber === this.apiItem.serialNumber) {
             this.certinKey = !this.certinKey
+            if(this.form.apiConfiguration[i].name !== this.apiItem.name){
+              this.apiItem.reName = true
+              this.apiItem.orgName = this.form.apiConfiguration[i].name
+            }else {
+              this.apiItem.reName = false
+            }
+            this.form.apiConfiguration[i] = JSON.parse(JSON.stringify(this.apiItem))
           }
         }
       } else {
@@ -1302,18 +1299,10 @@ export default {
     },
     handleCheckAllChange(apiItem, row, ref) {
       this.errMsg = []
-      this.handleCheckChange(apiItem, row)
-      apiItem.fields = []
-      this.handleFiledChange(apiItem, row)
-      if(ref === 'plxTable'){
-        this.$nextTick(() => {
-          this.$refs.plxTable?.reloadData(this.previewData(this.apiItem))
-        })
-      }else {
-        this.$nextTick(() => {
-          this.$refs.originPlxTable?.reloadData(this.previewData(this.originFieldItem))
-        })
-      }
+      this.handleCheckChange(this.apiItem, row)
+      this.apiItem.fields = []
+      this.handleFiledChange(this.apiItem, row)
+      this.previewData(this.apiItem)
 
       if (this.errMsg.length) {
         this.$message.error(
@@ -1351,7 +1340,7 @@ export default {
           apiItem.fields.push(jsonFields[i])
         }
         if (jsonFields[i].children !== undefined) {
-          this.handleFiledChange2(jsonFields[i].children)
+          this.handleFiledChange2(apiItem, jsonFields[i].children)
         }
       }
     },
@@ -1378,6 +1367,9 @@ export default {
             apiItem.fields[i].value[j]
           )
         }
+        this.$nextTick(() => {
+          this.$refs.plxTable?.reloadData(data)
+        })
       }
       this.showEmpty = apiItem.fields.length === 0
       return data
@@ -1391,9 +1383,7 @@ export default {
       }
     },
     fieldNameChange(row) {
-      this.$nextTick(() => {
-        this.$refs.plxTable?.reloadData(this.previewData(this.apiItem))
-      })
+      this.previewData(this.apiItem)
     },
     fieldTypeChange(row) {}
   }
