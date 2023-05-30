@@ -1,5 +1,3 @@
-import { $confirm } from '@/utils/message'
-
 export default {
   fu: {
     search_bar: {
@@ -1169,6 +1167,7 @@ export default {
     chart_bar_horizontal: '横向柱状图',
     chart_bar_stack_horizontal: '横向堆叠柱状图',
     chart_percentage_bar_stack_horizontal: '横向百分比柱状图',
+    chart_bidirectional_bar: '对称柱状图',
     chart_line: '基础折线图',
     chart_line_stack: '堆叠折线图',
     chart_pie: '饼图',
@@ -1488,6 +1487,7 @@ export default {
     total_sort_desc: '降序',
     total_sort_field: '排序字段',
     empty_data_strategy: '空值处理',
+    empty_data_field_ctrl: '字段设置',
     break_line: '保持为空',
     set_zero: '置为0',
     ignore_data: '隐藏空值',
@@ -2795,6 +2795,7 @@ export default {
     email: '邮箱：',
     tel: '电话：',
     web: '网址：',
+    bbs: '论坛：',
     apply: '免费试用申请',
     more: '更多',
     weChat_official_account: '微信公众号',

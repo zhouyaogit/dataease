@@ -34,7 +34,6 @@ import io.dataease.plugins.common.base.mapper.*;
 import io.dataease.plugins.common.constants.DatasetType;
 import io.dataease.plugins.common.constants.DatasourceTypes;
 import io.dataease.plugins.common.constants.DeTypeConstants;
-import io.dataease.plugins.common.dto.chart.ChartViewFieldDTO;
 import io.dataease.plugins.common.dto.dataset.SqlVariableDetails;
 import io.dataease.plugins.common.dto.datasource.DataSourceType;
 import io.dataease.plugins.common.dto.datasource.TableField;
@@ -1071,7 +1070,7 @@ public class DataSetTableService {
                         defaultsSqlVariableDetail.getDefaultValueScope().equals(SqlVariableDetails.DefaultValueScope.ALLSCOPE) && StringUtils.isNotEmpty(defaultsSqlVariableDetail.getDefaultValue())) {
                     sql = sql.replace(matcher.group(), defaultsSqlVariableDetail.getDefaultValue());
                 }
-                if (isEdit && defaultsSqlVariableDetail != null && StringUtils.isNotEmpty(defaultsSqlVariableDetail.getDefaultValue())){
+                if (isEdit && defaultsSqlVariableDetail != null && StringUtils.isNotEmpty(defaultsSqlVariableDetail.getDefaultValue())) {
                     sql = sql.replace(matcher.group(), defaultsSqlVariableDetail.getDefaultValue());
                 }
             }
@@ -1122,8 +1121,7 @@ public class DataSetTableService {
             SelectBody selectBody = ((SubSelect) fromItem).getSelectBody();
             SubSelect subSelect = new SubSelect();
             Select subSelectTmp = (Select) CCJSqlParserUtil.parse(removeVariables(selectBody.toString(), dsType));
-            PlainSelect subPlainSelect = ((PlainSelect) subSelectTmp.getSelectBody());
-            subSelect.setSelectBody(subPlainSelect);
+            subSelect.setSelectBody(subSelectTmp.getSelectBody());
             if (dsType.equals(DatasourceTypes.oracle.getType())) {
                 subSelect.setAlias(new Alias(fromItem.getAlias().toString(), false));
             } else {
@@ -1172,7 +1170,7 @@ public class DataSetTableService {
         if (binaryExpression != null) {
             if (!(binaryExpression.getLeftExpression() instanceof BinaryExpression) && !(binaryExpression.getLeftExpression() instanceof InExpression) && hasVariable(binaryExpression.getRightExpression().toString())) {
                 stringBuilder.append(SubstitutedSql);
-            }else {
+            } else {
                 expr.accept(getExpressionDeParser(stringBuilder));
             }
         } else {
@@ -1259,7 +1257,7 @@ public class DataSetTableService {
             throw new Exception(Translator.get("i18n_invalid_ds"));
         }
         String tmpSql = removeVariables(sql, ds.getType());
-        if(!realData){
+        if (!realData) {
             tmpSql.replaceAll(SubstitutedSql, SubstitutedSqlVirtualData);
         }
         if (dataSetTableRequest.getMode() == 1 && (tmpSql.contains(SubstitutedParams) || tmpSql.contains(SubstitutedSql.trim()))) {
@@ -1280,7 +1278,6 @@ public class DataSetTableService {
         QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
         String sqlAsTable = qp.createSQLPreview(sql, null);
         datasourceRequest.setQuery(sqlAsTable);
-
         Map<String, List> result;
         try {
             datasetSqlLog.setStartTime(System.currentTimeMillis());
@@ -2024,7 +2021,9 @@ public class DataSetTableService {
                 // custom 创建doris视图
                 createDorisView(TableUtils.tableName(datasetTable.getId()), sql);
 
-                datasourceRequest.setQuery(sql);
+                // getQuerySql to get field
+                QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
+                datasourceRequest.setQuery(qp.createSQLPreview(sql, null));
                 fields = datasourceProvider.fetchResultField(datasourceRequest);
                 for (DatasetTableField field : fieldList) {
                     for (TableField tableField : fields) {
@@ -2047,8 +2046,9 @@ public class DataSetTableService {
                 String sql = (String) sqlMap.get("sql");
                 List<DatasetTableField> fieldList = (List<DatasetTableField>) sqlMap.get("field");
 
-
-                datasourceRequest.setQuery(sql);
+                // getQuerySql to get field
+                QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
+                datasourceRequest.setQuery(qp.createSQLPreview(sql, null));
                 fields = datasourceProvider.fetchResultField(datasourceRequest);
 
                 for (DatasetTableField field : fieldList) {
@@ -2454,7 +2454,19 @@ public class DataSetTableService {
                 if (num > 1000) {
                     break;
                 }
-                data.add(Arrays.asList(line.split(",")));
+                String str;
+                line += ",";
+                Pattern pCells = Pattern.compile("(\"[^\"]*(\"{2})*[^\"]*\")*[^,]*,");
+                Matcher mCells = pCells.matcher(line);
+                List<String> cells = new ArrayList();//每行记录一个list
+                //读取每个单元格
+                while (mCells.find()) {
+                    str = mCells.group();
+                    str = str.replaceAll("(?sm)\"?([^\"]*(\"{2})*[^\"]*)\"?.*,", "$1");
+                    str = str.replaceAll("(?sm)(\"(\"))", "$2");
+                    cells.add(str);
+                }
+                data.add(cells);
                 num++;
             }
             ExcelSheetData excelSheetData = new ExcelSheetData();

@@ -2,6 +2,7 @@
 import { componentStyle } from '../common/common'
 import { BASE_ECHARTS_SELECT, DEFAULT_TOOLTIP } from '@/views/chart/chart/chart'
 import { isGradientValue } from '@/components/gradientColorSelector/base'
+import _ from 'lodash'
 const linearCOlor = (start, end) => {
   return {
     type: 'linear',
@@ -37,7 +38,7 @@ const fillGradientColor = (data, colors) => {
   })
   return data
 }
-export function baseMapOption(chart_option, chart, themeStyle, curAreaCode, seriesId) {
+export function baseMapOption(chart_option, geoJson, chart, themeStyle, curAreaCode, seriesId) {
   // 处理shape attr
   let customAttr = {}
   let isGradient = false
@@ -83,9 +84,9 @@ export function baseMapOption(chart_option, chart, themeStyle, curAreaCode, seri
       chart_option.tooltip.borderColor = bgColor
     }
   }
+  chart_option.title.text = chart.title
   // 处理data
   if (chart.data) {
-    chart_option.title.text = chart.title
     if (chart.data.series && chart.data.series.length > 0) {
       chart_option.series[0].name = chart.data.series[seriesIndex].name
       chart_option.series[0].selectedMode = true
@@ -146,20 +147,44 @@ export function baseMapOption(chart_option, chart, themeStyle, curAreaCode, seri
         }
       }
 
+      let senior = chart.senior
+      if (senior) {
+        senior = JSON.parse(senior)
+      }
+      // 空值处理，echarts 对于值为 null 的默认策略是不展示，也就是保持为空，所以只需要处理置为 0 就行
+      let emptyDataStrategy = senior?.functionCfg?.emptyDataStrategy
+      if (!emptyDataStrategy) {
+        emptyDataStrategy = 'breakLine'
+      }
+      const subArea = new Set(geoJson.features.map(item => item.properties.name))
       for (let i = 0; i < valueArr.length; i++) {
         const y = valueArr[i]
         y.name = chart.data.x[i]
+        subArea.delete(y.name)
+        if (y.value === null && emptyDataStrategy === 'setZero') {
+          const tmp = _.clone(y)
+          tmp.value = 0
+          chart_option.series[0].data.push(tmp)
+          continue
+        }
         chart_option.series[0].data.push(y)
       }
+      if (emptyDataStrategy === 'setZero' && subArea.size > 0) {
+        subArea.forEach(item => {
+          chart_option.series[0].data.push({
+            name: item,
+            value: 0
+          })
+        })
+      }
+
       if (isGradient) {
         chart_option.series[0].data = fillGradientColor(chart_option.series[0].data, customAttr.color.colors)
         delete chart_option.visualMap
       }
 
-      if (chart.senior) {
-        const senior = JSON.parse(chart.senior)
-
-        senior && senior.mapMapping && senior.mapMapping[curAreaCode] && (chart_option.geo.nameMap = senior.mapMapping[curAreaCode])
+      if (senior) {
+        senior.mapMapping && senior.mapMapping[curAreaCode] && (chart_option.geo.nameMap = senior.mapMapping[curAreaCode])
       }
 
       if (chart.data?.detailFields?.length > 1) {

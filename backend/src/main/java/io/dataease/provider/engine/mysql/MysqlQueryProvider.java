@@ -1096,7 +1096,9 @@ public class MysqlQueryProvider extends QueryProvider {
             if (StringUtils.containsIgnoreCase(request.getOperator(), "in")) {
                 whereValue = "('" + StringUtils.join(value, "','") + "')";
             } else if (StringUtils.containsIgnoreCase(request.getOperator(), "like")) {
-                whereValue = "'%" + value.get(0) + "%'";
+                String keyword = value.get(0).toUpperCase();
+                whereValue = "'%" + keyword + "%'";
+                whereName = "upper(" + whereName + ")";
             } else if (StringUtils.containsIgnoreCase(request.getOperator(), "between")) {
                 if (request.getDatasetTableField().getDeType() == 1) {
                     if (request.getDatasetTableField().getDeExtractType() == 2
@@ -1143,11 +1145,11 @@ public class MysqlQueryProvider extends QueryProvider {
             case "y":
                 return "%Y";
             case "y_Q":
-                return "CONCAT(%s,'" + split + "',%s)";
+                return "CONCAT(%s,'" + split + "','Q',%s)";
             case "y_M":
                 return "%Y" + split + "%m";
             case "y_W":
-                return "%Y" + split + "%u";
+                return "%Y" + split + "W%u";
             case "y_M_d":
                 return "%Y" + split + "%m" + split + "%d";
             case "H_m_s":

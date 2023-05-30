@@ -200,6 +200,17 @@ export function getLabel(chart) {
                 f.formatterCfg.thousandSeparator = false
               }
               res = valueFormatter(param.value, f.formatterCfg)
+            } else if (chart.type === 'bidirectional-bar') {
+              let yaxis = yAxis[0]
+              if (param['series-field-key'] === 'extValue') {
+                yaxis = JSON.parse(chart.yaxisExt)[0]
+              }
+              const value = param[param['series-field-key']]
+              if (yaxis.formatterCfg) {
+                res = valueFormatter(value, yaxis.formatterCfg)
+              } else {
+                res = valueFormatter(value, formatterItem)
+              }
             } else if (equalsAny(chart.type, 'bar-group')) {
               const f = yAxis[0]
               if (f.formatterCfg) {
@@ -343,6 +354,17 @@ export function getTooltip(chart) {
                 } else {
                   res = valueFormatter(param.value, formatterItem)
                 }
+              }
+            } else if (chart.type === 'bidirectional-bar') {
+              let yaxis = yAxis[0]
+              if (param['series-field-key'] === 'extValue') {
+                yaxis = JSON.parse(chart.yaxisExt)[0]
+              }
+              obj = { name: yaxis.name, value: param[param['series-field-key']] }
+              if (yaxis.formatterCfg) {
+                res = valueFormatter(obj.value, yaxis.formatterCfg)
+              } else {
+                res = valueFormatter(obj.value, formatterItem)
               }
             } else if (chart.type.includes('treemap')) {
               obj = { name: param.name, value: param.value }
@@ -506,7 +528,20 @@ export function getLegend(chart) {
           marker: {
             symbol: legendSymbol
           },
-          radio: false // 柱状图图例的聚焦功能，默认先关掉
+          radio: false, // 柱状图图例的聚焦功能，默认先关掉
+          itemName: {
+            formatter: (text, item, index) => {
+              if (chart.type !== 'bidirectional-bar') {
+                return text
+              }
+              const yaxis = JSON.parse(chart.yaxis)[0]
+              const yaxisExt = JSON.parse(chart.yaxisExt)[0]
+              if (index === 0) {
+                return yaxis.name
+              }
+              return yaxisExt.name
+            }
+          }
         }
       } else {
         legend = false
@@ -677,8 +712,8 @@ export function getYAxis(chart) {
         const axisValue = a.axisValue
         if (!chart.type.includes('horizontal')) {
           if (axisValue && !axisValue.auto) {
-            axisValue.min && (axis.minLimit = parseFloat(axisValue.min))
-            axisValue.max && (axis.maxLimit = parseFloat(axisValue.max))
+            axisValue.min && (axis.minLimit = axis.min = parseFloat(axisValue.min))
+            axisValue.max && (axis.maxLimit = axis.max = parseFloat(axisValue.max))
             axisValue.splitCount && (axis.tickCount = parseFloat(axisValue.splitCount))
           }
         }
@@ -930,4 +965,21 @@ export function setGradientColor(rawColor, show = false, angle = 0) {
   const item = rawColor.split(',')
   item.splice(3, 1, '0.3)')
   return show ? `l(${angle}) 0:${item.join(',')} 1:${rawColor}` : rawColor
+}
+
+export function getMeta(chart) {
+  let meta
+  if (chart.type === 'bidirectional-bar') {
+    const xAxis = JSON.parse(chart.xaxis)
+    if (xAxis?.length === 1 && xAxis[0].deType === 1) {
+      const values = chart.data.data.map(item => item.field)
+      meta = {
+        field: {
+          type: 'cat',
+          values: values.reverse()
+        }
+      }
+    }
+  }
+  return meta
 }

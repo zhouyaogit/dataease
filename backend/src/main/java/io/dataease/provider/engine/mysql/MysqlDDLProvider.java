@@ -20,7 +20,7 @@ public class MysqlDDLProvider extends DDLProviderImpl {
 
     private static final String creatTableSql =
             "CREATE TABLE IF NOT EXISTS `TABLE_NAME`" +
-            "Column_Fields;" ;
+            "Column_Fields" + " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_general_ci;" ;
 
 
     @Override
@@ -39,9 +39,9 @@ public class MysqlDDLProvider extends DDLProviderImpl {
             for (int i = 0; i < strings.length; i++) {
                 if (StringUtils.isEmpty(strings[i])) {
                     strings1[i] = null;
-                } else {
-                    strings1[i] = strings[i].replace("'", "\\'");
+                    continue;
                 }
+                strings1[i] = strings[i].replace("\\", "\\\\").replace("'", "\\'");
             }
             values.append("('").append(UUID.randomUUID())
                     .append("','").append(String.join("','", Arrays.asList(strings1)))
@@ -87,27 +87,19 @@ public class MysqlDDLProvider extends DDLProviderImpl {
                     break;
                 case 1:
                     size  = size < 50? 50 : size;
-                    if (size < 65533) {
-                        Column_Fields.append("varchar(length)".replace("length", String.valueOf(datasetTableField.getSize()))).append(",`");
-                    }else {
-                        Column_Fields.append("longtext").append(",`");
-                    }
+                    Column_Fields.append("longtext").append(",`");
                     break;
                 case 2:
                     Column_Fields.append("bigint(20)").append(",`");
                     break;
                 case 3:
-                    Column_Fields.append("varchar(100)").append(",`");
+                    Column_Fields.append("longtext").append(",`");
                     break;
                 case 4:
                     Column_Fields.append("TINYINT(length)".replace("length", String.valueOf(datasetTableField.getSize()))).append(",`");
                     break;
                 default:
-                    if (size < 65533) {
-                        Column_Fields.append("varchar(length)".replace("length", String.valueOf(datasetTableField.getSize()))).append(",`");
-                    }else {
-                        Column_Fields.append("longtext").append(",`");
-                    }
+                    Column_Fields.append("longtext").append(",`");
                     break;
             }
         }

@@ -536,7 +536,6 @@ import TextAttr from '@/components/canvas/components/TextAttr'
 import { userLoginInfo } from '@/api/systemInfo/userLogin'
 import { activeWatermark } from '@/components/canvas/tools/watermark'
 import PositionAdjust from '@/views/chart/view/PositionAdjust'
-
 export default {
   name: 'PanelEdit',
   components: {

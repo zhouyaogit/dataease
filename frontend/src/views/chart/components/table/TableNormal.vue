@@ -99,7 +99,6 @@ import eventBus from '@/components/canvas/utils/eventBus'
 import { DEFAULT_COLOR_CASE, DEFAULT_SCROLL, DEFAULT_SIZE, NOT_SUPPORT_PAGE_DATASET } from '@/views/chart/chart/chart'
 import { mapState } from 'vuex'
 import DePagination from '@/components/deCustomCm/pagination.js'
-
 export default {
   name: 'TableNormal',
   components: { DePagination },

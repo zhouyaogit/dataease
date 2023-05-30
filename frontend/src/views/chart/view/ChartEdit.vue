@@ -782,7 +782,7 @@
                     </el-row>
                     <!--yAxisExt-->
                     <el-row
-                      v-if="view.type && view.type === 'chart-mix'"
+                      v-if="equalsAny(view.type , 'chart-mix', 'bidirectional-bar')"
                       class="padding-lr"
                       style="margin-top: 6px;"
                     >
@@ -983,12 +983,7 @@
                       </div>
                     </el-row>
                     <el-row
-                      v-if="view.type
-                        && !(view.type.includes('table') && view.render === 'echarts')
-                        && !view.type.includes('text') && !view.type.includes('gauge')
-                        && view.type !== 'liquid' && view.type !== 'word-cloud'
-                        && view.type !== 'table-pivot' && view.type !=='label'
-                        && view.type !=='richTextView' && view.type !== 'flow-map'"
+                      v-if="showDrill"
                       class="padding-lr"
                       style="margin-top: 6px;"
                     >
@@ -1088,12 +1083,12 @@
         >
           <el-row class="view-panel">
             <div
-              v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('area') || view.type.includes('mix') || view.type.includes('gauge') || view.type === 'text' || view.type === 'label' || view.type.includes('table') || view.type === 'map' || view.type === 'buddle-map')"
+              v-if="showCfg"
               style="overflow:auto;border-right: 1px solid #e6e6e6;height: 100%;width: 100%;"
               class="attr-style theme-border-class"
             >
               <el-row
-                v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('area') || view.type.includes('mix') || view.type === 'table-normal' || view.type === 'table-info')"
+                v-if="showSeniorCfg"
               >
                 <span class="padding-lr">{{ $t('chart.senior_cfg') }}</span>
                 <el-collapse
@@ -1101,7 +1096,7 @@
                   class="style-collapse"
                 >
                   <el-collapse-item
-                    v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('area') || view.type.includes('mix'))"
+                    v-if="showFunctionCfg"
                     name="function"
                     :title="$t('chart.function_cfg')"
                   >
@@ -1113,7 +1108,7 @@
                     />
                   </el-collapse-item>
                   <el-collapse-item
-                    v-if="view.type && (view.type === 'table-normal' || view.type === 'table-info')"
+                    v-if="showScrollCfg"
                     name="scroll"
                     :title="$t('chart.scroll_cfg')"
                   >
@@ -1127,7 +1122,7 @@
                 </el-collapse>
               </el-row>
               <el-row
-                v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('area') || view.type.includes('mix') || view.type.includes('gauge') || view.type === 'text' || view.type === 'label' || (view.render === 'antv' && view.type.includes('table')))"
+                v-if="showAnalyseCfg"
               >
                 <span class="padding-lr">{{ $t('chart.analyse_cfg') }}</span>
                 <el-collapse
@@ -1135,7 +1130,7 @@
                   class="style-collapse"
                 >
                   <el-collapse-item
-                    v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('area') || view.type.includes('mix'))"
+                    v-if="showAssistLineCfg"
                     name="analyse"
                     :title="$t('chart.assist_line')"
                   >
@@ -1148,7 +1143,7 @@
                     />
                   </el-collapse-item>
                   <el-collapse-item
-                    v-if="view.type && (view.type.includes('gauge') || view.type === 'text' || view.type === 'label' || (view.render === 'antv' && view.type.includes('table')))"
+                    v-if="showThresholdCfg"
                     name="threshold"
                     :title="$t('chart.threshold')"
                   >
@@ -1162,7 +1157,9 @@
                 </el-collapse>
               </el-row>
 
-              <el-row v-if="view.type && (view.type === 'map' || view.type === 'buddle-map')">
+              <el-row
+                v-if="view.type && (view.type === 'map' || view.type === 'buddle-map')"
+              >
 
                 <span
                   v-if="false"
@@ -1761,7 +1758,6 @@ import CalcChartFieldEdit from '@/views/chart/view/CalcChartFieldEdit'
 import { equalsAny, includesAny } from '@/utils/StringUtils'
 import PositionAdjust from '@/views/chart/view/PositionAdjust'
 import MarkMapDataEditor from '@/views/chart/components/map/MarkMapDataEditor'
-
 export default {
   name: 'ChartEdit',
   components: {
@@ -1799,7 +1795,7 @@ export default {
     DrillPath,
     PluginCom,
     MapMapping,
-    MarkMapDataEditor
+    MarkMapDataEditor,
   },
   props: {
     param: {
@@ -1954,11 +1950,51 @@ export default {
     panelInfo() {
       return this.$store.state.panel.panelInfo
     },
+    showCfg() {
+      return includesAny(this.view.type, 'bar', 'line', 'area', 'mix', 'gauge', 'table') ||
+        equalsAny(this.view.type, 'text', 'label', 'map', 'buddle-map')
+    },
+    showSeniorCfg() {
+      return includesAny(this.view.type, 'bar', 'line', 'area', 'mix', 'table') ||
+        equalsAny(this.view.type, 'table-normal', 'table-info', 'map')
+    },
+    showFunctionCfg() {
+      return includesAny(this.view.type, 'bar', 'line', 'area', 'mix', 'table') ||
+        equalsAny(this.view.type, 'map')
+    },
+    showScrollCfg() {
+      return equalsAny(this.view.type, 'table-normal', 'table-info')
+    },
+    showAnalyseCfg() {
+      if (this.view.type === 'bidirectional-bar') {
+        return false
+      }
+      return includesAny(this.view.type, 'bar', 'line', 'area', 'mix', 'gauge') ||
+        equalsAny(this.view.type, 'text', 'label') ||
+        (this.view.render === 'antv' && this.view.type.includes('table'))
+    },
+    showAssistLineCfg() {
+      return includesAny(this.view.type, 'bar', 'line', 'area', 'mix')
+    },
+    showThresholdCfg() {
+      if (this.view.type === 'bidirectional-bar') {
+        return false
+      }
+      return includesAny(this.view.type, 'gauge') ||
+        equalsAny(this.view.type, 'text', 'label') ||
+        (this.view.render === 'antv' && this.view.type.includes('table'))
+    },
+    showDrill() {
+      return this.view.type &&
+        !(this.view.type.includes('table') && this.view.render === 'echarts') &&
+        !includesAny(this.view.type, 'text', 'gauge') &&
+        !equalsAny(this.view.type, 'liquid', 'bidirectional-bar',
+          'word-cloud', 'table-pivot', 'label', 'richTextView', 'flow-map')
+    },
     ...mapState([
       'curComponent',
       'panelViewEditInfo',
       'allViewRender'
-
     ])
   },
   watch: {
@@ -2276,7 +2312,7 @@ export default {
           ele.compareCalc = compareItem
         }
       })
-      if (view.type === 'chart-mix') {
+      if (equalsAny(view.type, 'chart-mix', 'bidirectional-bar')) {
         view.yaxisExt.forEach(function(ele) {
           if (!ele.chartType) {
             ele.chartType = 'bar'
@@ -2918,7 +2954,7 @@ export default {
 
     // 更换数据集
     changeChart() {
-      const optType = this.view.tableId === this.changeTable.id ? 'same' : 'change'
+      const optType = this.view.tableId === this.changeTable.id && this.view.dataFrom!=='template' ? 'same' : 'change'
       // 更换数据集后清空视图字段，并重新请求数据；否则没有操作
       if (optType === 'change') {
         this.view.dataFrom = 'dataset'
@@ -3029,7 +3065,7 @@ export default {
     addYaxis(e) {
       this.dragCheckType(this.view.yaxis, 'q')
       this.dragMoveDuplicate(this.view.yaxis, e)
-      if ((this.view.type === 'waterfall' || this.view.type === 'word-cloud' || this.view.type.includes('group')) && this.view.yaxis.length > 1) {
+      if ((equalsAny(this.view.type, 'waterfall', 'word-cloud', 'bidirectional-bar') || this.view.type.includes('group')) && this.view.yaxis.length > 1) {
         this.view.yaxis = [this.view.yaxis[0]]
       }
       this.calcData(true)
@@ -3037,7 +3073,7 @@ export default {
     addYaxisExt(e) {
       this.dragCheckType(this.view.yaxisExt, 'q')
       this.dragMoveDuplicate(this.view.yaxisExt, e)
-      if (this.view.type === 'map' && this.view.yaxisExt.length > 1) {
+      if (equalsAny(this.view.type, 'map', 'bidirectional-bar') && this.view.yaxisExt.length > 1) {
         this.view.yaxisExt = [this.view.yaxisExt[0]]
       }
       this.calcData(true)
@@ -3327,6 +3363,10 @@ export default {
         this.view.senior.functionCfg.emptyDataStrategy = 'ignoreData'
       } else if (type.includes('line')) {
         this.view.customAttr.label.position = 'top'
+      } else if (equalsAny(type, 'table-info', 'table-pivot')) {
+        if (this.view?.senior?.functionCfg?.emptyDataStrategy === 'ignoreData') {
+          this.view.senior.functionCfg.emptyDataStrategy = 'breakLine'
+        }
       }
       // reset custom colors
       this.view.customAttr.color.seriesColors = []

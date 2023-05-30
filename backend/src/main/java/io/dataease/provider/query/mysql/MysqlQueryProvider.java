@@ -72,6 +72,7 @@ public class MysqlQueryProvider extends QueryProvider {
             case "MEDIUMINT":
             case "INTEGER":
             case "BIGINT":
+            case "BIGINT UNSIGNED":
             case "LONG": //增加了LONG类型
                 return 2;// 整型
             case "FLOAT":
@@ -1064,16 +1065,33 @@ public class MysqlQueryProvider extends QueryProvider {
                 if (field.getDeType() == 1) {
                     String format = transDateFormat(request.getDateStyle(), request.getDatePattern());
                     if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5 || field.getDeExtractType() == 1) {
-                        if (StringUtils.equalsIgnoreCase(request.getDateStyle(), "y_Q")) {
-                            whereName = String.format(format,
-                                    String.format(MysqlConstants.DATE_FORMAT, originName, "%Y"),
-                                    String.format(MysqlConstants.QUARTER, String.format(MysqlConstants.DATE_FORMAT, originName, MysqlConstants.DEFAULT_DATE_FORMAT)));
-                        } else {
-                            whereName = String.format(MySQLConstants.DATE_FORMAT, originName, format);
+                        String date = String.format(MySQLConstants.STR_TO_DATE, originName, StringUtils.isNotEmpty(field.getDateFormat()) ? field.getDateFormat() : MysqlConstants.DEFAULT_DATE_FORMAT);
+                        if(request.getOperator().equals("between")){
+                            whereName = date;
+                        }else {
+                            if (StringUtils.equalsIgnoreCase(request.getDateStyle(), "y_Q")) {
+                                whereName = String.format(format,
+                                        String.format(MysqlConstants.DATE_FORMAT, originName, "%Y"),
+                                        String.format(MysqlConstants.QUARTER, String.format(MysqlConstants.DATE_FORMAT, originName, MysqlConstants.DEFAULT_DATE_FORMAT)));
+                            } else {
+                                whereName = String.format(MySQLConstants.DATE_FORMAT, date, format);
+                            }
                         }
+
                     }
                     if (field.getDeExtractType() == 2 || field.getDeExtractType() == 3 || field.getDeExtractType() == 4) {
-                        whereName = originName;
+                        if(request.getOperator().equals("between")){
+                            whereName = originName;
+                        }else {
+                            String cast = String.format(MySQLConstants.CAST, originName, MySQLConstants.DEFAULT_INT_FORMAT) + "/1000";
+                            if (StringUtils.equalsIgnoreCase(request.getDateStyle(),"y_Q")){
+                                whereName = String.format(format,
+                                        String.format(MysqlConstants.DATE_FORMAT, cast, "%Y"),
+                                        String.format(MysqlConstants.QUARTER, String.format(MysqlConstants.DATE_FORMAT, field, MysqlConstants.DEFAULT_DATE_FORMAT)));
+                            } else {
+                                whereName = String.format(MySQLConstants.FROM_UNIXTIME, cast, format);
+                            }
+                        }
                     }
                 } else if (field.getDeType() == 2 || field.getDeType() == 3) {
                     if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5) {
@@ -1103,7 +1121,9 @@ public class MysqlQueryProvider extends QueryProvider {
             if (StringUtils.containsIgnoreCase(request.getOperator(), "in")) {
                 whereValue = "('" + StringUtils.join(value, "','") + "')";
             } else if (StringUtils.containsIgnoreCase(request.getOperator(), "like")) {
-                whereValue = "'%" + value.get(0) + "%'";
+                String keyword = value.get(0).toUpperCase();
+                whereValue = "'%" + keyword + "%'";
+                whereName = "upper(" + whereName + ")";
             } else if (StringUtils.containsIgnoreCase(request.getOperator(), "between")) {
                 if (request.getDatasetTableField().getDeType() == 1) {
                     if (request.getDatasetTableField().getDeExtractType() == 2
@@ -1158,11 +1178,11 @@ public class MysqlQueryProvider extends QueryProvider {
             case "y":
                 return "%Y";
             case "y_Q":
-                return "CONCAT(%s,'" + split + "',%s)";
+                return "CONCAT(%s,'" + split + "','Q',%s)";
             case "y_M":
                 return "%Y" + split + "%m";
             case "y_W":
-                return "%Y" + split + "%u";
+                return "%Y" + split + "W%u";
             case "y_M_d":
                 return "%Y" + split + "%m" + split + "%d";
             case "H_m_s":
